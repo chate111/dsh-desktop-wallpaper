@@ -176,6 +176,27 @@ describe('resolveWallpaper', () => {
   }
 });
 
+describe('内置壁纸库（@builtin）', () => {
+  it('@builtin 解析到包内的 wallpapers/ 并列出示例图', () => {
+    const result = host.listImages(host.BUILTIN_FOLDER);
+    assert.equal(result.ok, true, result.ok ? '' : result.error);
+    assert.ok(result.images.length > 0, '包内应带示例壁纸');
+    assert.ok(result.folder.endsWith('wallpapers'), `解析到了 ${result.folder}`);
+  });
+
+  it('@builtin 里的图能被解析并给出位图 MIME', () => {
+    const first = host.listImages(host.BUILTIN_FOLDER).images[0];
+    const target = host.resolveWallpaper(host.BUILTIN_FOLDER, first.name);
+    assert.notEqual(target, null);
+    assert.ok(target.mime.startsWith('image/'), target.mime);
+  });
+
+  it('@builtin 一样受目录约束：拒绝穿越与子目录', () => {
+    assert.equal(host.resolveWallpaper(host.BUILTIN_FOLDER, '../package.json'), null);
+    assert.equal(host.resolveWallpaper(host.BUILTIN_FOLDER, 'sub/x.jpg'), null);
+  });
+});
+
 describe('HTTP 路由（假 ctx 驱动真 handler）', () => {
   const { ctx, routes, warnings, dispose } = fakeContext();
   host.apply(ctx);
