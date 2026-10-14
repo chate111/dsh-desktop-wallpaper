@@ -42,4 +42,4 @@
   而内容列那唯一的 16px 圆角会把它露成一块与不透明顶栏对不上的小角。
   现在用应用自己发布的变量 `--dsh-windows-content-radius` 把该角改成直角，与其余三角一致。
 
-[0.1.0]: https://github.com/OWNER/REPO/releases/tag/v0.1.0
+[0.1.0]: https://github.com/chate111/dsh-desktop-wallpaper/releases/tag/v0.1.0
