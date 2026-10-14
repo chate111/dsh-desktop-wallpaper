@@ -1,0 +1,11 @@
+# dsh-desktop-wallpaper bundle patch: inserts the wallpaper plugin row into the
+# profile roster. Applied as a profile bundle layer (the `dsh.bundle.patch`
+# manifest field).
+#
+# The row is a bare plugin by package name: the node half (exports ".") runs in
+# the host process and registers the wallpaper-library routes, while the
+# `dsh.client` declaration in package.json loads the browser half
+# (exports "./client") into the GUI.
+- insert:
+    - id: ui-dsh-desktop-wallpaper
+      name: dsh-desktop-wallpaper

@@ -1,0 +1,19 @@
+# Dependencies (the plugin itself has none)
+node_modules/
+.pnpm-store/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and scratch files
+*.log
+*.tmp
+*.bak
+_tmp/

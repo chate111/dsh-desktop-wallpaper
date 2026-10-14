@@ -1,0 +1,29 @@
+# 零依赖、零构建，所以 CI 只需要一个 Node 和一个命令。
+# 只在 Windows 上跑：宿主半区的原生目录对话框、路径分隔符与
+# drive-letter 语义都是 Windows 专属。
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: 语法检查
+        run: |
+          node --check lib/index.js
+          node --check lib/client.js
+      - name: 单元 + 集成测试
+        run: npm test

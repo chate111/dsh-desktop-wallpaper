@@ -1,0 +1,180 @@
+/**
+ * dsh-desktop-wallpaper — 浏览器半区测试（node:test，零依赖）。
+ *
+ * 手法：把 `window.__ModuleLoader__` 换成桩，捕获 factory 的返回值；
+ * 再给一个刚好够 `captureOriginals()` / `detectSidebarScope()` 用的最小 DOM，
+ * 于是可以在 Node 里直接断言**真实生成的样式表**。
+ *
+ * 不调用 `apply()` —— 那会真的去改 DOM、请求宿主路由并挂 MutationObserver。
+ *
+ * 这里锁住的是三件曾经踩过的事：
+ *   1. 表面 token 必须整块重复声明（在 body 与侧栏绘制元素上各一遍）；
+ *   2. 顶部 `[class*="frame"]::before` 必须被压回**不透明**，否则壁纸从菜单栏渗出；
+ *   3. 内容列左上角圆角必须改成直角，否则露出与顶栏对不上的缝。
+ */
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+/** 主题里那些表面 token 的“采样值”。 */
+const THEME_COLOR = 'rgb(24, 28, 42)';
+/** 故意让一个 token 不是颜色，用来验证会被跳过。 */
+const NON_COLOR_TOKEN = '--dsw-specific-sidebar-fill-shadow';
+
+let client;
+let sampledTokens;
+
+/** 采样式：宿主半区读的是 `window.getComputedStyle`，全局那个也一并挂上以防万一。 */
+const computedStyleStub = {
+  getPropertyValue: (token) => (token === NON_COLOR_TOKEN ? '12px' : THEME_COLOR),
+};
+
+globalThis.window = {
+  __ModuleLoader__: {
+    load({ id, factory }) {
+      assert.equal(id, 'dsh-desktop-wallpaper');
+      client = factory();
+    },
+  },
+  getComputedStyle: () => computedStyleStub,
+};
+
+/** 可被 `element.matches()` 识别的假侧栏元素。 */
+const fakeSidebar = {
+  matches: (selector) => /sidebar/i.test(String(selector)),
+  getAttribute: () => null,
+  setAttribute() {},
+  querySelector: () => null,
+};
+
+globalThis.document = {
+  documentElement: {
+    attributes: {},
+    setAttribute() {},
+    removeAttribute() {},
+    hasAttribute: () => true,
+  },
+  head: { appendChild() {} },
+  body: { appendChild() {}, removeChild() {} },
+  createElement() {
+    return {
+      style: {},
+      textContent: '',
+      setAttribute() {},
+      remove() {},
+      appendChild() {},
+    };
+  },
+  querySelector: (selector) => (/sidebar/i.test(String(selector)) ? fakeSidebar : null),
+  querySelectorAll: () => [],
+  addEventListener() {},
+  removeEventListener() {},
+};
+
+globalThis.getComputedStyle = () => computedStyleStub;
+
+await import('../lib/client.js');
+
+const internals = client.__internals;
+
+describe('模块契约', () => {
+  it('导出 apply / inject，且不硬依赖任何服务', () => {
+    assert.equal(typeof client.apply, 'function');
+    assert.deepEqual(client.inject, []);
+  });
+
+  it('暴露测试用的内部成员', () => {
+    for (const key of ['DEFAULT_SETTINGS', 'SURFACE_TOKENS', 'SIDEBAR_DARKEN', 'sanitize', 'sidebarSurface', 'translucent', 'darken', 'buildStylesheet'])
+      assert.ok(key in internals, `缺少 ${key}`);
+  });
+});
+
+describe('translucent', () => {
+  it('100% 原样返回，0% 直接透明', () => {
+    assert.equal(internals.translucent(THEME_COLOR, 100), THEME_COLOR);
+    assert.equal(internals.translucent(THEME_COLOR, 0), 'transparent');
+  });
+
+  it('中间值用 color-mix 现算，不硬编码调色板', () => {
+    assert.equal(internals.translucent(THEME_COLOR, 66), `color-mix(in srgb, ${THEME_COLOR} 66%, transparent)`);
+  });
+});
+
+describe('darken', () => {
+  it('0 不改变，20 就是往黑里混 20%', () => {
+    assert.equal(internals.darken(THEME_COLOR, 0), THEME_COLOR);
+    assert.equal(internals.darken(THEME_COLOR, 20), `color-mix(in srgb, ${THEME_COLOR} 80%, #000)`);
+  });
+
+  it('可以套在 translucent 外面（侧栏实际用法）', () => {
+    assert.equal(
+      internals.darken(internals.translucent(THEME_COLOR, 81), 20),
+      `color-mix(in srgb, color-mix(in srgb, ${THEME_COLOR} 81%, transparent) 80%, #000)`,
+    );
+  });
+});
+
+describe('sidebarSurface', () => {
+  it('侧栏 = 主区 + delta（默认 66 + 15）', () => {
+    assert.equal(internals.sidebarSurface(), 81);
+  });
+});
+
+describe('sanitize', () => {
+  it('越界值被夹紧', () => {
+    const settings = internals.sanitize({ surface: 500, sidebarDelta: -20, dim: 999, blur: 99 });
+    assert.equal(settings.surface, 100);
+    assert.equal(settings.sidebarDelta, 0);
+    assert.equal(settings.dim, 80);
+    assert.equal(settings.blur, 24);
+  });
+});
+
+describe('buildStylesheet', () => {
+  const css = internals.buildStylesheet();
+
+  it('所有规则都在插件自己的 gate 下', () => {
+    const rules = css.split('\n').filter((line) => line.trim() !== '');
+    assert.ok(rules.length >= 4);
+    for (const rule of rules)
+      assert.ok(rule.startsWith('html[data-dwp-active]'), `规则未加 gate: ${rule.slice(0, 60)}`);
+  });
+
+  it('body 与侧栏各自整块重声明表面 token（alpha 不同）', () => {
+    assert.ok(css.includes(`html[data-dwp-active] body { --`));
+    assert.ok(css.includes(`${THEME_COLOR} 66%, transparent`), '主区应为 66%');
+    assert.ok(css.includes(`[class*="sidebarCol"] { --`), '侧栏规则应落在真正绘制的元素上');
+    assert.ok(css.includes(`${THEME_COLOR} 81%, transparent`), '侧栏应为 81%');
+  });
+
+  it('侧栏额外压暗 20%（回归：本次优化）', () => {
+    const sidebarRule = css.split('\n').find((line) => line.includes('[class*="sidebarCol"] {'));
+    assert.ok(sidebarRule !== undefined);
+    assert.ok(sidebarRule.includes('80%, #000'), '侧栏应混入 20% 纯黑');
+    assert.ok(!css.split('\n').find((line) => line.includes('html[data-dwp-active] body { --')).includes('#000'), '主区不应被压暗');
+  });
+
+  it('顶栏 ::before 被压回不透明（需求①）', () => {
+    const strip = css.split('\n').find((line) => line.includes('::before'));
+    assert.ok(strip !== undefined);
+    assert.ok(strip.includes('background: rgb(24, 28, 42) !important'), '顶栏底色必须是不透明的主题原色');
+    assert.ok(!strip.includes('color-mix'), '顶栏不得半透明');
+  });
+
+  it('内容列左上角圆角改成直角（回归：小角缝隙）', () => {
+    assert.ok(css.includes('--dsh-windows-content-radius: 0px !important'));
+  });
+
+  it('抬升 #root 让背景层位于应用之下', () => {
+    assert.ok(css.includes('z-index: 1 !important'));
+    assert.ok(css.includes('z-index: -1') === false, '不得用负 z-index（DSH 里不绘制）');
+  });
+
+  it('启用时隐藏皮肤图层（避免两层背景打架）', () => {
+    assert.ok(css.includes('div[data-wx-skin-layer]'));
+    assert.ok(css.includes('display: none !important'));
+  });
+
+  it('非颜色的 token 被跳过而不是写进无效 CSS', () => {
+    assert.equal(css.includes(NON_COLOR_TOKEN), false);
+  });
+});

@@ -1,0 +1,61 @@
+{
+  "name": "dsh-desktop-wallpaper",
+  "version": "0.1.0",
+  "description": "DSH 桌面端壁纸插件：把本地文件夹当壁纸库，面板内手动点选，暗化 / 模糊 / 透出三条滑杆可拖，并按区域差异化透出（顶部原生菜单栏保持全黑不透、左侧栏比主内容区少透出 15% 并额外压暗 20%）。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "client-plugin",
+    "wallpaper",
+    "background",
+    "desktop"
+  ],
+  "author": "chate111 <13782039151@163.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chate111/dsh-desktop-wallpaper.git"
+  },
+  "homepage": "https://github.com/chate111/dsh-desktop-wallpaper#readme",
+  "bugs": {
+    "url": "https://github.com/chate111/dsh-desktop-wallpaper/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "node --check lib/index.js && node --check lib/client.js",
+    "test": "node --test test/",
+    "verify": "npm run check && npm test"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}
