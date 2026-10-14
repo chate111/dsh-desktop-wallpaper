@@ -1,6 +1,7 @@
 # 🖼️ dsh-desktop-wallpaper
 
 [![CI](https://github.com/chate111/dsh-desktop-wallpaper/actions/workflows/ci.yml/badge.svg)](https://github.com/chate111/dsh-desktop-wallpaper/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/dsh-desktop-wallpaper.svg)](https://www.npmjs.com/package/dsh-desktop-wallpaper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
@@ -21,6 +22,7 @@
 - [使用](#-使用)
 - [工作原理](#-工作原理)
 - [测试](#-测试)
+- [发布（维护者）](#-发布维护者)
 - [项目结构](#-项目结构)
 - [兼容性](#-兼容性)
 - [License](#-license)
@@ -59,7 +61,18 @@
 
 插件必须装进**桌面端自己的 profile**（`$DSH_HOME/profiles/desktop`）。
 
-### 方式一：应用内的安装向导（推荐）
+### 方式一：从 npm 安装（最省事）
+
+```sh
+dsh plugin --profile desktop add dsh-desktop-wallpaper
+```
+
+或在桌面端里 **设置 → 插件 → 安装**，直接填包名 `dsh-desktop-wallpaper`。
+
+已发布到 npm：<https://www.npmjs.com/package/dsh-desktop-wallpaper>
+（国内走 `registry.npmmirror.com` 镜像同样可装 ✓）
+
+### 方式二：应用内的安装向导（本地开发用）
 
 1. 打开桌面端 → **设置 → 插件 → 安装**；
 2. 粘贴本插件的**绝对路径**（`link:` / `file:` 前缀与裸路径都被接受）：
@@ -70,7 +83,7 @@
 3. 向导会把依赖写进 profile 并**同步层栈**（`dsh.profile.bundles`）——
    只声明了 `dsh.bundle.patch` 的依赖才属于层栈。
 
-### 方式二：应用自带的 CLI
+### 方式三：应用自带的 CLI
 
 桌面端内置了一份放开 desktop profile 的 CLI（普通 `dsh` 会拒绝该 profile）：
 
@@ -79,7 +92,7 @@
     plugin --profile desktop add "link:D:\deepseek harness\dsh-desktop-wallpaper"
 ```
 
-### 方式三：手工两步（等价做法）
+### 方式四：手工两步（等价做法）
 
 ```sh
 # 1) 装成本地 link 依赖
@@ -224,6 +237,24 @@ npm test        # 47 项断言（宿主 30 + 浏览器 17）
 > `npm test` **直接执行两个测试文件**，而不是 `node --test test/` —— 后者的目录发现行为在
 > Node 20 / 22 / 24 之间不一致（22 与 24 会非零退出，CI 上亲测）。直接执行在三个版本上都稳定，
 > 也不依赖测试运行器去 spawn 子进程（受限沙箱里 `node --test` 会因命名管道被禁而报 `spawn EPERM`）。
+
+---
+
+## 🚀 发布（维护者）
+
+```sh
+npx npm@11 stage publish .      # 提交到暂存区（不需要 2FA）；需 npm ≥ 11.15
+npx npm@11 stage list           # 取 stage-id
+npx npm@11 stage approve <id>   # 批准并公开（--otp 六位码）
+```
+
+> npm 现在默认走「**暂存发布**」：`npm publish`（或 `stage publish`）会先建一个 `0.0.0-stage`
+> 占位版本，真实版本要**维护者再带 2FA 批准一次**才公开 —— 即便 token 被盗也发不出正式版本。
+> **网页批准**（npmjs.com 的 **Staged Packages** 页）支持安全密钥；CLI 的 `--otp` 只接受
+> 验证器 App 的 6 位码 ✓。
+>
+> ⚠️ 本机若把 registry 指向镜像（`registry.npmmirror.com`），发布时必须显式加
+> `--registry=https://registry.npmjs.org` —— 镜像是**只读**的，不接受发布。
 
 ---
 
