@@ -40,6 +40,7 @@
   | ① 顶部「应用 / 编辑」菜单栏 | **不参与**，恒定完全不透 |
   | ② 左侧栏 | 主区 **+15%**（更实、壁纸更少），并再往黑里混 **20%** |
   | ③ 主内容区 | 滑杆基准值（默认 66%） |
+  | ④ 底部输入区 | **不参与**，恒定完全不透（正文滚过它下方时要看得清） |
 
 - **自动关闭皮肤**：启用壁纸时把 `dsh-wx-skin` 的背景层隐藏，避免两层背景打架（可关掉这个开关）。
 - **持久化**：设置写到 `$DSH_HOME/dsh-desktop-wallpaper.settings.json`（`localStorage` 作镜像兜底），
@@ -162,7 +163,7 @@ html[data-dwp-active] [class*="sidebarCol"] { --dsw-…: color-mix(in srgb, colo
 `--dsw-specific-sidebar-fill`），子树里的表面因此各自拿到自己的 alpha。
 外层 `color-mix(… 80%, #000)` 就是「比主区再黑 20%」。
 
-四个必须注意的坑（都是实测踩出来的）：
+五个必须注意的坑（都是实测踩出来的）：
 
 1. **采样前必须先清空自己的样式表**，否则读到的是自己上一次写入的半透明值，每次重建都会累积透明度。
 2. **token 在 `body` 上，不在 `:root`** —— 读 `documentElement` 会得到空字符串，功能静默失效。
@@ -171,6 +172,11 @@ html[data-dwp-active] [class*="sidebarCol"] { --dsw-…: color-mix(in srgb, colo
 4. **内容列左上角那唯一的 16px 圆角**会把 frame 的半透明背景露成一块小角，
    与不透明的顶栏对不上。frame 必须保持半透明（侧栏背后的壁纸要透出来），
    所以插件改用应用自己发布的 `--dsh-windows-content-radius` 把那个角改成直角，与其余三角一致。
+5. **底部输入区上方有一条官方渐变遮罩**（`.composerSeat` 的 `linear-gradient`，终点色是
+   `--dsw-alias-bg-base`），用来让正文在到达输入框前淡出。整块 token 变半透明后，
+   遮罩终点成了"透明"，滚过的正文就从输入框里透出来 —— 所以输入区作用域
+   （`[class*="composer"]`）必须把表面 token 钉回**主题原色**。
+   这与顶栏是同一种手法：照抄官方已经用上的元素作用域，而不是另写一套。
 
 ### 入口位置
 
@@ -192,7 +198,7 @@ html[data-dwp-active] [class*="sidebarCol"] { --dsw-…: color-mix(in srgb, colo
 
 ```sh
 npm run check   # 两个半区的语法检查
-npm test        # 43 项断言（宿主 27 + 浏览器 16）
+npm test        # 44 项断言（宿主 27 + 浏览器 17）
 ```
 
 - **宿主半区**：纯函数（`sanitizeSettings` / `listImages` / `resolveWallpaper`）＋

@@ -153,6 +153,14 @@ describe('buildStylesheet', () => {
     assert.ok(!css.split('\n').find((line) => line.includes('html[data-dwp-active] body { --')).includes('#000'), '主区不应被压暗');
   });
 
+  it('输入区保持不透明（回归：正文滚到输入框下面看不清）', () => {
+    const composerRule = css.split('\n').find((line) => line.includes('[class*="composer"] {'));
+    assert.ok(composerRule !== undefined, '应有输入区作用域的规则');
+    assert.ok(composerRule.includes(THEME_COLOR), '输入区应使用主题原色');
+    assert.ok(!composerRule.includes('color-mix'), '输入区不得半透明');
+    assert.ok(!composerRule.includes('#000'), '输入区不应被压暗');
+  });
+
   it('顶栏 ::before 被压回不透明（需求①）', () => {
     const strip = css.split('\n').find((line) => line.includes('::before'));
     assert.ok(strip !== undefined);

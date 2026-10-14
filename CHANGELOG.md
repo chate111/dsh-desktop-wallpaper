@@ -31,6 +31,11 @@
 - **侧栏入口与原生行错位**：入口的 `margin`/`padding`/`border`/字号自成一套，
   内容左边距 19px，而宿主原生行是 10px。现按原生行数值对齐
   （`min-height:36px`、`margin:0 2px`、`padding:7px 8px`、`border:none`、`font:inherit`）。
+- **正文滚到输入框下面看不清**：shell 本来在输入区上方画了一条渐变遮罩
+  （`linear-gradient`，终点色是 `--dsw-alias-bg-base`），让正文在到达输入框前淡出。
+  把整块表面 token 调成半透明后，遮罩终点也变成"透明"，于是滚过的正文从输入框里透出来。
+  现在把输入区（`[class*="composer"]` 作用域）的表面 token 钉回**主题原色**，
+  窗口其余部分照旧透出壁纸。
 - **内容区左上角圆角露出半透明缝隙**：frame 背景保持半透明（侧栏背后的壁纸要透出来），
   而内容列那唯一的 16px 圆角会把它露成一块与不透明顶栏对不上的小角。
   现在用应用自己发布的变量 `--dsh-windows-content-radius` 把该角改成直角，与其余三角一致。
