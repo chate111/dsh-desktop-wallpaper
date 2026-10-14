@@ -221,8 +221,9 @@ npm test        # 47 项断言（宿主 30 + 浏览器 17）
 
 两个测试文件都把 `DSH_HOME` 指向临时目录，**不会读写机器上真实的设置文件**。
 
-> 本机若在受限沙箱里跑 `npm test`（`node --test` 需要 spawn 子进程拿管道），可能报 `spawn EPERM`；
-> 此时直接跑文件即可：`node test/host.test.mjs && node test/client.test.mjs`。
+> `npm test` **直接执行两个测试文件**，而不是 `node --test test/` —— 后者的目录发现行为在
+> Node 20 / 22 / 24 之间不一致（22 与 24 会非零退出，CI 上亲测）。直接执行在三个版本上都稳定，
+> 也不依赖测试运行器去 spawn 子进程（受限沙箱里 `node --test` 会因命名管道被禁而报 `spawn EPERM`）。
 
 ---
 

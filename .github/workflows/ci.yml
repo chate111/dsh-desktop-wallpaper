@@ -1,6 +1,11 @@
-# 零依赖、零构建，所以 CI 只需要一个 Node 和一个命令。
+# 零依赖、零构建，所以 CI 只需要一个 Node 和一条命令。
+#
 # 只在 Windows 上跑：宿主半区的原生目录对话框、路径分隔符与
 # drive-letter 语义都是 Windows 专属。
+#
+# 用 `npm test`（= 直接执行两个测试文件）而不是 `node --test test/`：
+# 后者的目录发现行为在 Node 20 / 22 / 24 之间不一致（22 与 24 会非零退出），
+# 而直接执行测试文件在三个版本上都稳定。
 name: CI
 
 on:
@@ -17,13 +22,15 @@ jobs:
       matrix:
         node: ['20', '22', '24']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
-      - name: 语法检查
+      - name: 环境
         run: |
-          node --check lib/index.js
-          node --check lib/client.js
+          node --version
+          npm --version
+      - name: 语法检查
+        run: npm run check
       - name: 单元 + 集成测试
         run: npm test
