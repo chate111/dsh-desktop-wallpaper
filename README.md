@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
-**高度适配 DSH Desktop（Electron 桌面端）的壁纸插件** —— 侧栏「新会话」下方一个「壁纸」入口，
+**Purpose-built for DSH Desktop（Electron 桌面端）的壁纸插件** —— 侧栏「新会话」下方一个「壁纸」入口，
 点开面板选一个**本地文件夹**当壁纸库（或直接用**包内自带的 9 张示例图**），
 在里面手动点选图片，并用 **暗化 / 模糊 / 透出** 三条滑杆实时调效果。
 表面透明度**按区域分开**：顶部菜单栏与底部输入卡片完全不透，
