@@ -15,8 +15,22 @@
 
 ---
 
+## 📸 界面预览
+
+**① 侧栏入口** —— 就在「新会话」正下方，点开即面板：
+
+![侧栏「壁纸」入口](https://raw.githubusercontent.com/chate111/dsh-desktop-wallpaper/main/docs/screenshot-entry.png)
+
+**② 壁纸面板** —— 一个本地文件夹就是壁纸库（也可以填 `@builtin` 用包内 9 张示例图）、
+缩略图手动点选、暗化 / 模糊 / 透出三条滑杆，底部实时显示各区域的透出数值：
+
+![壁纸面板：文件夹行、缩略图网格、三条滑杆与分区数值](https://raw.githubusercontent.com/chate111/dsh-desktop-wallpaper/main/docs/screenshot-panel.png)
+
+---
+
 ## 目录
 
+- [界面预览](#-界面预览)
 - [功能](#-功能)
 - [安装 / 卸载](#-安装--卸载)
 - [使用](#-使用)
@@ -267,6 +281,7 @@ dsh-desktop-wallpaper/
 ├── lib/
 │   ├── index.js            # 宿主半区：5 条回环路由 + 原生目录对话框 + 原子写设置
 │   └── client.js           # 浏览器半区：侧栏入口 / 面板 / 背景层 / 分区 token
+├── docs/                   # README 里的界面截图（只随 GitHub 仓库，不进 npm 包）
 ├── wallpapers/             # 9 张内置示例壁纸（原图，最长边最高 7680），用 @builtin 引用
 ├── test/
 │   ├── host.test.mjs       # 宿主：纯函数 + 假 ctx 驱动真 handler
