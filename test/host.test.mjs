@@ -458,6 +458,21 @@ describe('Wallpaper Engine 导入（读运行插件那台机器，不写死路�
     assert.equal(again.skipped, 3);
   });
 
+  it('预算不被已导入的文件吃掉（回归：第二次点击永远导 0 个）', async () => {
+    const dir = join(sandbox, 'budget');
+    const options = { roots: rootsOf(), targetDir: dir, includeImages: true, maxTotalBytes: 45 * 1024 };
+
+    const first = await host.importWallpaperEngine(options);
+    assert.equal(first.copied, 1);
+    assert.equal(first.skipped, 0);
+    assert.equal(first.truncated, true);
+
+    const second = await host.importWallpaperEngine(options);
+    assert.equal(second.skipped, 1, '上一轮写入的应算作已导入');
+    assert.equal(second.copied, 1, '预算不该被已导入的文件占满');
+    assert.equal(second.bytes, 30 * 1024, '只统计真正拷进来的字节');
+  });
+
   it('总量上限会截断，下一轮还能接着导', async () => {
     const capped = await host.importWallpaperEngine({
       roots: rootsOf(),
