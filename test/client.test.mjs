@@ -83,13 +83,30 @@ describe('模块契约', () => {
   });
 
   it('暴露测试用的内部成员', () => {
-    for (const key of ['DEFAULT_SETTINGS', 'SURFACE_TOKENS', 'SIDEBAR_DARKEN', 'sanitize', 'sidebarSurface', 'translucent', 'darken', 'kindOf', 'VIDEO_LAYER_CSS', 'buildStylesheet'])
+    for (const key of ['DEFAULT_SETTINGS', 'SURFACE_TOKENS', 'SIDEBAR_DARKEN', 'sanitize', 'sidebarSurface', 'translucent', 'darken', 'kindOf', 'VIDEO_LAYER_CSS', 'pageCount', 'PAGE_SIZE', 'buildStylesheet'])
       assert.ok(key in internals, `缺少 ${key}`);
   });
 
   it('默认文件夹是内置示例图（装完打开面板就有图可点）', () => {
     assert.equal(internals.DEFAULT_SETTINGS.folder, '@builtin');
     assert.equal(internals.sanitize({}).folder, '@builtin');
+  });
+});
+
+describe('pageCount', () => {
+  it('每页 3 列 × 5 行 = 15 个', () => {
+    assert.equal(internals.PAGE_SIZE, 15);
+  });
+
+  it('空库算 1 页，正好一页不多算', () => {
+    assert.equal(internals.pageCount(0), 1);
+    assert.equal(internals.pageCount(1), 1);
+    assert.equal(internals.pageCount(15), 1);
+    assert.equal(internals.pageCount(16), 2);
+  });
+
+  it('127 个（9 自带 + 118 索引）→ 9 页', () => {
+    assert.equal(internals.pageCount(127), 9);
   });
 });
 

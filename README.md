@@ -56,6 +56,8 @@
   > ⚠️ 这 9 张是**第三方素材**（搜集自公开壁纸站点），仅作功能演示，
   > 版权归原作者所有；**侵删致歉** —— 详见 [wallpapers/NOTICE.md](wallpapers/NOTICE.md)。
 - **手动点选**：面板里是缩略图网格，点哪张用哪张；当前选中的显示大图预览。
+- **分页**：网格 3 列 × **5 行 = 每页 15 个**，底部「‹ 上一页 / n / m 页 / 下一页 ›」。
+  127 个壁纸 = 9 页，面板不会因为库大而无限变长；换文件夹自动回到第 1 页。
 - **视频壁纸**：文件夹里的 `mp4` / `webm` 也能直接当壁纸 —— 背景层换成 `<video muted loop playsinline>`，
   `暗化` / `模糊` 同样作用在视频上。面板里每个视频都有**首帧缩略图**（滚到可见才加载那一帧，
   几百个视频也不会一次发几百个请求），鼠标**悬停即播放**，选中后预览区直接播。
@@ -251,7 +253,7 @@ html[data-dwp-active] [class*="sidebarCol"] { --dsw-…: color-mix(in srgb, colo
 
 ```sh
 npm run check   # 两个半区的语法检查
-npm test        # 75 项断言（宿主 48 + 浏览器 27）
+npm test        # 78 项断言（宿主 48 + 浏览器 30）
 ```
 
 - **宿主半区**：纯函数（`sanitizeSettings` / `listImages` / `resolveWallpaper`）＋
