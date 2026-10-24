@@ -14,6 +14,17 @@
 
 ### 新增
 
+- **一键导入本机 Wallpaper Engine 壁纸**（面板新增按钮「导入本机 WE 视频」）：
+  - 发现完全按运行插件的机器来：注册表 `SteamPath` → `libraryfolders.vdf` 的每个库 →
+    `workshop/content/431960` 与 `wallpaper_engine/projects`。**不写死任何盘符路径**，
+    并对 `D:\Steam` 与 `D:\steam` 这种大小写别名去重（否则每个作品会被扫两遍）。
+  - 默认只收 `mp4` / `webm`，并永久跳过 `preview.*`：WE 里的图片不是缩略图就是 `.pkg`
+    场景的贴图，收进来只是噪音。
+  - 单文件 ≤ 120 MB、每轮 ≤ 1.5 GB；装不下的**跳过而不是中断**，按体积从小到大填满预算，
+    所以再点一次就能接着导。已存在且大小相同的跳过，整条链路幂等。
+  - 落在 `$DSH_HOME/dsh-desktop-wallpaper/imported/`，**不进 npm 包**；`@builtin` 把
+    自带 9 张与导入的文件合成一个列表（重名时自带优先），`/img` 也会在目录里回查。
+  - 同一时刻只允许一个导入，重复请求回 409。
 - **首次安装默认用自带示例图**：`DEFAULT_SETTINGS.folder` 从空改成 `@builtin`，
   所以装完打开面板就是那 9 张缩略图，点一张直接生效 —— 不用先选文件夹，也不用知道
   `@builtin` 这个哨兵值。面板的文件夹行把 `@builtin` 显示成「内置示例图（9 张）」，
@@ -36,12 +47,14 @@
 
 ### 测试
 
-- 63 项（宿主 38 + 浏览器 25）。新增：视频 MIME、`kind` 分流、`Range` 四类分支、
+- 71 项（宿主 46 + 浏览器 25）。新增：视频 MIME、`kind` 分流、`Range` 四类分支、
   `kindOf` 的扩展名边界（大写、无扩展名、`v1.2.mp4`）、`posterUrl` 的 `#t=` 片段与转义、
-  `cancelActivePicker()` 的空转路径，以及「默认库就是 `@builtin` 且真的能列出 9 张」——
-  防止以后改默认值时用户装完看到空面板。
-- 另做过一次真实文件集成验证：拿 Wallpaper Engine 库里真实的 mp4/webm 起真 HTTP 服务，
-  逐段比对字节与 `Content-Range`。
+  `cancelActivePicker()` 的空转路径、WE 导入的发现/筛选/命名/幂等/预算截断，
+  以及「默认库就是 `@builtin` 且真的能列出 9 张」—— 防止以后改默认值时用户装完看到空面板。
+- 另做过两次真实验证：拿 Wallpaper Engine 库里真实的 mp4/webm 起真 HTTP 服务逐段比对字节；
+  在真机上跑了一遍发现 + 限额导入（40 MB 预算装下 17 个视频，文件名取的是工坊标题）。
+- 测试用 `discoverWallpaperEngineRoots(..., { registry: false, defaults: false })` 把搜索范围
+  钉死在临时目录 —— 第一版没钉，结果测试把你本机的 219 个订阅也扫了进来。
 
 ### 文档
 

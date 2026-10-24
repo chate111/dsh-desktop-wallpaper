@@ -10,7 +10,7 @@
  * `/pick` 路由只断言"注册了" —— 真调它会弹出原生目录对话框。
  */
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
@@ -230,10 +230,10 @@ describe('HTTP 路由（假 ctx 驱动真 handler）', () => {
   const { ctx, routes, warnings, dispose } = fakeContext();
   host.apply(ctx);
 
-  it('注册了全部 5 条路由', () => {
+  it('注册了全部 6 条路由', () => {
     assert.deepEqual(
       [...routes.keys()].sort(),
-      [host.LOAD_ROUTE, host.SAVE_ROUTE, host.PICK_ROUTE, host.LIST_ROUTE, host.IMG_ROUTE].sort(),
+      [host.LOAD_ROUTE, host.SAVE_ROUTE, host.PICK_ROUTE, host.LIST_ROUTE, host.IMG_ROUTE, host.IMPORT_ROUTE].sort(),
     );
   });
 
@@ -384,7 +384,7 @@ describe('HTTP 路由（假 ctx 驱动真 handler）', () => {
   });
 
   it('disposer 会注销全部路由', () => {
-    assert.equal(routes.size, 5);
+    assert.equal(routes.size, 6);
     dispose()();
     assert.equal(routes.size, 0);
   });
@@ -394,5 +394,102 @@ describe('HTTP 路由（假 ctx 驱动真 handler）', () => {
     assert.doesNotThrow(() => host.apply(bare.ctx));
     assert.equal(bare.routes.size, 0);
     assert.equal(bare.warnings.length, 1);
+  });
+});
+
+describe('Wallpaper Engine 导入（读运行插件那台机器，不写死路径）', () => {
+  const steam = join(sandbox, 'fake-steam');
+  const workshop = join(steam, 'steamapps', 'workshop', 'content', '431960');
+  const projects = join(steam, 'steamapps', 'common', 'wallpaper_engine', 'projects');
+  const imported = join(sandbox, 'imported');
+  const rootsOf = () => host.discoverWallpaperEngineRoots([steam], { registry: false, defaults: false });
+
+  before(() => {
+    mkdirSync(join(workshop, '1111111'), { recursive: true });
+    // 标题里故意带 / 与空格，验证文件名清理
+    writeFileSync(join(workshop, '1111111', 'project.json'), JSON.stringify({ title: '雨窗 / Rain' }));
+    writeFileSync(join(workshop, '1111111', 'video.mp4'), Buffer.alloc(40 * 1024, 3));
+    writeFileSync(join(workshop, '1111111', 'preview.jpg'), Buffer.alloc(1024, 4)); // 太小，应跳过
+    mkdirSync(join(workshop, '2222222'), { recursive: true });
+    writeFileSync(join(workshop, '2222222', 'still.png'), Buffer.alloc(30 * 1024, 5));
+    writeFileSync(join(workshop, '2222222', 'notes.txt'), 'nope');
+    mkdirSync(join(projects, 'myprojects', '自建'), { recursive: true });
+    writeFileSync(join(projects, 'myprojects', '自建', 'scene.jpg'), Buffer.alloc(20 * 1024, 6));
+  });
+
+  it('从给定的 Steam 根找到工坊与 projects 目录', () => {
+    const roots = rootsOf();
+    assert.equal(roots.length, 1);
+    assert.equal(roots[0].workshop, workshop);
+    assert.equal(roots[0].projects, projects);
+  });
+
+  it('默认只挑视频（WE 里的图片多是缩略图/贴图）', () => {
+    const scanned = host.scanWallpaperEngine({ roots: rootsOf() }).map((candidate) => candidate.name).sort();
+    assert.deepEqual(scanned, ['video.mp4']);
+  });
+
+  it('preview.* 永远跳过，即使勾了 includeImages', () => {
+    const scanned = host.scanWallpaperEngine({ roots: rootsOf(), includeImages: true })
+      .map((candidate) => candidate.name)
+      .sort();
+    assert.deepEqual(scanned, ['scene.jpg', 'still.png', 'video.mp4']);
+    assert.equal(scanned.includes('preview.jpg'), false);
+  });
+
+  it('导入时用「标题-工坊ID」命名，并避开非法字符', async () => {
+    const result = await host.importWallpaperEngine({ roots: rootsOf(), targetDir: imported });
+    assert.equal(result.ok, true);
+    assert.equal(result.copied, 1); // 默认视频优先
+    assert.equal(result.failed, 0);
+    assert.ok(existsSync(join(imported, '雨窗 Rain-1111111.mp4')), '应使用标题 + 工坊 id');
+  });
+
+  it('includeImages 时图片也能进，still 用文件名兜底', async () => {
+    const result = await host.importWallpaperEngine({ roots: rootsOf(), targetDir: imported, includeImages: true });
+    assert.equal(result.copied, 2);
+    assert.ok(existsSync(join(imported, 'still-2222222.png')));
+    assert.ok(existsSync(join(imported, 'scene-myprojects.jpg')));
+  });
+
+  it('再导一次是幂等的（同样大小视为已导入）', async () => {
+    const again = await host.importWallpaperEngine({ roots: rootsOf(), targetDir: imported, includeImages: true });
+    assert.equal(again.copied, 0);
+    assert.equal(again.skipped, 3);
+  });
+
+  it('总量上限会截断，下一轮还能接着导', async () => {
+    const capped = await host.importWallpaperEngine({
+      roots: rootsOf(),
+      targetDir: join(sandbox, 'capped'),
+      maxTotalBytes: 45 * 1024,
+      includeImages: true,
+    });
+    assert.equal(capped.truncated, true);
+    assert.ok(capped.copied >= 1, `只导入了 ${capped.copied} 个`);
+    assert.ok(capped.copied < 3);
+  });
+
+  it('@builtin 把导入的壁纸和自带那 9 张合成一个列表', () => {
+    const previous = process.env.DSH_WALLPAPER_IMPORT_DIR;
+    process.env.DSH_WALLPAPER_IMPORT_DIR = imported;
+    try {
+      const listed = host.listImages(host.BUILTIN_FOLDER);
+      assert.equal(listed.ok, true);
+      assert.ok(listed.images.length >= 12, `只有 ${listed.images.length} 项`);
+      const name = 'still-2222222.png';
+      assert.ok(listed.images.some((image) => image.name === name));
+      const resolved = host.resolveWallpaper(host.BUILTIN_FOLDER, name);
+      assert.notEqual(resolved, null);
+      assert.equal(resolved.mime, 'image/png');
+      // 导入的文件名不得让自带的 9 张消失
+      assert.ok(listed.images.some((image) => image.name.startsWith('【哲风壁纸】')));
+    }
+    finally {
+      if (previous === undefined)
+        delete process.env.DSH_WALLPAPER_IMPORT_DIR;
+      else
+        process.env.DSH_WALLPAPER_IMPORT_DIR = previous;
+    }
   });
 });
