@@ -242,6 +242,14 @@ describe('buildStylesheet', () => {
     assert.ok(css.includes('display: none !important'));
   });
 
+  it('说明文字不带底色（回归：导入按钮下面那块白底）', () => {
+    const start = internals.BASE_CSS.indexOf('.dsw-wp-note');
+    assert.ok(start >= 0, '缺少 .dsw-wp-note 规则');
+    const rule = internals.BASE_CSS.slice(start, internals.BASE_CSS.indexOf('}', start));
+    assert.ok(rule.includes('background: none'), rule);
+    assert.ok(!rule.includes('panel-soft'), '说明条不得再铺 panel-soft 底色');
+  });
+
   it('非颜色的 token 被跳过而不是写进无效 CSS', () => {
     assert.equal(css.includes(NON_COLOR_TOKEN), false);
   });

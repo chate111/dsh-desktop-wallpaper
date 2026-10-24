@@ -250,7 +250,7 @@ html[data-dwp-active] [class*="sidebarCol"] { --dsw-…: color-mix(in srgb, colo
 
 ```sh
 npm run check   # 两个半区的语法检查
-npm test        # 71 项断言（宿主 46 + 浏览器 25）
+npm test        # 72 项断言（宿主 46 + 浏览器 26）
 ```
 
 - **宿主半区**：纯函数（`sanitizeSettings` / `listImages` / `resolveWallpaper`）＋
