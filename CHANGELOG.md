@@ -38,6 +38,14 @@
 
 ### 新增
 
+- **性能优化**（加载更快、拖滑杆不卡）：
+  - 表面 token 采样与整段 CSS 生成按 (主题, 透出, 侧栏差值, 皮肤开关) 缓存；滑块拖动只做纯样式写入。
+    实测命中缓存 0.003 ms/次（1000 次 0.74 ms），而原来每次 `applyVisuals()` 都要
+    `getComputedStyle` 一遍并在 style 标签里做一次 swap。
+  - 启动时 `/load` 与 `/list` **并行**发起（列表只用 localStorage 里的 folder），少一次串行往返。
+  - 主题 `MutationObserver` 用 `requestAnimationFrame` 合并：shell 频繁改 body class 只重算一帧，
+    且只有主题 key 变了才重新采样 token。
+  - 滑杆按用途分流：`暗化` / `模糊` 走 `applyMedia()`（纯样式），只有 `透出` 走 `applySurfaces()`。
 - **网格分页**：3 列 × 5 行 = 每页 15 个，底部「‹ 上一页 / n / m 页 · 共 N 个 / 下一页 ›」。
   127 个壁纸（9 自带 + 118 索引）= 9 页；换文件夹自动回第 1 页；翻页后网格滚回视野内。
 - **一键收录本机 Wallpaper Engine 壁纸**（面板按钮「扫描本机 Wallpaper Engine」）：

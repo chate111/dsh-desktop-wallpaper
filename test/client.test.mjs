@@ -93,6 +93,23 @@ describe('模块契约', () => {
   });
 });
 
+describe('样式表缓存', () => {
+  it('设置没变时重复调用不再重建（回归：每次 applyVisuals 都重采样 token）', () => {
+    internals.buildStylesheet();
+    const builds = internals.styleBuilds();
+    for (let index = 0; index < 50; index += 1)
+      internals.buildStylesheet();
+    assert.equal(internals.styleBuilds(), builds, '50 次调用不应再触发一次构建');
+  });
+
+  it('缓存的 CSS 与真实构建结果一致', () => {
+    const first = internals.buildStylesheet();
+    const second = internals.buildStylesheet();
+    assert.equal(first, second);
+    assert.ok(first.includes('html[data-dwp-active]'));
+  });
+});
+
 describe('pageCount', () => {
   it('每页 3 列 × 5 行 = 15 个', () => {
     assert.equal(internals.PAGE_SIZE, 15);
