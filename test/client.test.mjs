@@ -83,7 +83,7 @@ describe('模块契约', () => {
   });
 
   it('暴露测试用的内部成员', () => {
-    for (const key of ['DEFAULT_SETTINGS', 'SURFACE_TOKENS', 'SIDEBAR_DARKEN', 'sanitize', 'sidebarSurface', 'translucent', 'darken', 'kindOf', 'buildStylesheet'])
+    for (const key of ['DEFAULT_SETTINGS', 'SURFACE_TOKENS', 'SIDEBAR_DARKEN', 'sanitize', 'sidebarSurface', 'translucent', 'darken', 'kindOf', 'VIDEO_LAYER_CSS', 'buildStylesheet'])
       assert.ok(key in internals, `缺少 ${key}`);
   });
 });
@@ -110,6 +110,23 @@ describe('darken', () => {
       internals.darken(internals.translucent(THEME_COLOR, 81), 20),
       `color-mix(in srgb, color-mix(in srgb, ${THEME_COLOR} 81%, transparent) 80%, #000)`,
     );
+  });
+});
+
+describe('VIDEO_LAYER_CSS', () => {
+  const css = internals.VIDEO_LAYER_CSS;
+
+  it('替换元素必须有显式宽高（回归：视频缩在左上角、只显示一部分）', () => {
+    assert.match(css, /width:calc\(100% \+ 80px\)/);
+    assert.match(css, /height:calc\(100% \+ 80px\)/);
+    assert.match(css, /object-fit:cover/);
+    assert.match(css, /object-position:center center/);
+    assert.doesNotMatch(css, /inset:-40px/, '<video> 是替换元素，只写 inset 会被忽略');
+  });
+
+  it('过扫描与图片层一致（-40px），模糊后不留硬边', () => {
+    assert.match(css, /left:-40px/);
+    assert.match(css, /top:-40px/);
   });
 });
 
