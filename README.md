@@ -26,6 +26,11 @@
 
 ![壁纸面板：文件夹行、缩略图网格、三条滑杆与分区数值](https://raw.githubusercontent.com/chate111/dsh-desktop-wallpaper/main/docs/screenshot-panel.png)
 
+**③ 真机效果** —— 127 项的内置库（9 张自带 + 118 个本机 Wallpaper Engine 视频），
+视频缩略图是首帧、不播放；只有选中的那条在海面背景里循环播放：
+
+![视频壁纸库：视频首帧缩略图、分页、以及正在播放的海面壁纸](https://raw.githubusercontent.com/chate111/dsh-desktop-wallpaper/main/docs/screenshot-video-panel.png)
+
 ---
 
 ## 目录
