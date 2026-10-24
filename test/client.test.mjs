@@ -135,6 +135,19 @@ describe('VIDEO_LAYER_CSS', () => {
   });
 });
 
+describe('posterUrl', () => {
+  it('带 #t=0.1 媒体片段（浏览器据此绘制首帧）', () => {
+    assert.equal(internals.posterUrl('a.mp4'), '/dsh-desktop-wallpaper/img?name=a.mp4#t=0.1');
+  });
+
+  it('中文与空格照常转义，片段在 # 之后', () => {
+    const url = internals.posterUrl('我的 视频.webm');
+    assert.ok(url.endsWith('#t=0.1'), url);
+    assert.equal(url.includes(' '), false, '空格必须被转义');
+    assert.ok(url.includes('%E6%88%91'), '中文必须被转义');
+  });
+});
+
 describe('sidebarSurface', () => {
   it('侧栏 = 主区 + delta（默认 66 + 15）', () => {
     assert.equal(internals.sidebarSurface(), 81);
