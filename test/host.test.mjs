@@ -475,6 +475,19 @@ describe('Wallpaper Engine 索引（只记路径，不复制；读运行插件�
     assert.ok(listed.images.some((image) => image.name.startsWith('【哲风壁纸】')));
   });
 
+  it('保存的是绝对 wallpapers 路径时也当成内置库（回归：列表只剩 9 张、索引名 404）', () => {
+    host.indexWallpaperEngine({ roots: rootsOf(), includeImages: true });
+    const builtinPath = host.listImages(host.BUILTIN_FOLDER).folder;
+
+    const viaPath = host.listImages(builtinPath);
+    assert.equal(viaPath.builtin, true, '绝对路径也要标记成内置库，客户端才能把哨兵改回来');
+    assert.ok(viaPath.images.length >= 12, `只有 ${viaPath.images.length} 项`);
+
+    const resolved = host.resolveWallpaper(builtinPath, 'still-2222222.png');
+    assert.notEqual(resolved, null, '绝对路径下也要能解析索引里的名字');
+    assert.equal(host.resolveWallpaper(builtinPath, '..\\..\\secret.mp4'), null);
+  });
+
   it('源文件被删掉后，索引条目自动消失、解析返回 null', () => {
     host.indexWallpaperEngine({ roots: rootsOf(), includeImages: true });
     const ghost = join(workshop, '2222222', 'still.png');
