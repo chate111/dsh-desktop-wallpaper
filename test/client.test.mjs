@@ -250,6 +250,11 @@ describe('buildStylesheet', () => {
     assert.ok(!rule.includes('panel-soft'), '说明条不得再铺 panel-soft 底色');
   });
 
+  it('面板不再有厚黑投影（回归：四周那圈黑边）', () => {
+    assert.ok(internals.BASE_CSS.includes('box-shadow: none'), '面板投影应关掉');
+    assert.equal(internals.BASE_CSS.includes('0 18px 48px'), false, '旧的 48px 黑影不得回来');
+  });
+
   it('非颜色的 token 被跳过而不是写进无效 CSS', () => {
     assert.equal(css.includes(NON_COLOR_TOKEN), false);
   });

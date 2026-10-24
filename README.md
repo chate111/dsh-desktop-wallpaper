@@ -250,11 +250,11 @@ html[data-dwp-active] [class*="sidebarCol"] { --dsw-…: color-mix(in srgb, colo
 
 ```sh
 npm run check   # 两个半区的语法检查
-npm test        # 72 项断言（宿主 46 + 浏览器 26）
+npm test        # 73 项断言（宿主 46 + 浏览器 27）
 ```
 
 - **宿主半区**：纯函数（`sanitizeSettings` / `listImages` / `resolveWallpaper`）＋
-  用假 cordis ctx 驱动**真实 handler** —— 5 条路由注册、设置往返落盘、原图/视频流式返回与 MIME、
+  用假 cordis ctx 驱动**真实 handler** —— 6 条路由注册、设置往返落盘、原图/视频流式返回与 MIME、
   `Range` 的 206 / 416 / 后缀区间 / 非法回退、路径穿越拒绝、`405 / 403 / 400 / 404 / 413`、
   disposer 注销、缺 `webServer` 时只警告不抛异常。
   `/pick` 只断言"注册了" —— 真调它会弹出原生对话框。
