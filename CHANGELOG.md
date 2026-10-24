@@ -7,8 +7,12 @@
 
 ### 新增
 
+- **首次安装默认用自带示例图**：`DEFAULT_SETTINGS.folder` 从空改成 `@builtin`，
+  所以装完打开面板就是那 9 张缩略图，点一张直接生效 —— 不用先选文件夹，也不用知道
+  `@builtin` 这个哨兵值。面板的文件夹行把 `@builtin` 显示成「内置示例图（9 张）」，
+  而不是把哨兵原样印出来。
 - **视频壁纸**：`mp4` / `webm` 现在和图片一样能当壁纸。
-  - 背景层多一个 `<video muted loop playsinline autoplay>`（同样 `inset:-40px` 过扫描），
+  - 背景层多一个 `<video muted loop playsinline autoplay>`（同样 `-40px` 过扫描），
     `暗化` 走 scrim、`模糊` 走 `filter`，和图片的行为一致。
   - 只有 `src` 真的换了才重新加载 —— `applyVisuals()` 在切主题时也会跑，
     否则每次切主题都会把视频重启一遍。
@@ -22,8 +26,9 @@
 
 ### 测试
 
-- 56 项（宿主 36 + 浏览器 20）。新增：视频 MIME、`kind` 分流、`Range` 四类分支、
-  `kindOf` 的扩展名边界（大写、无扩展名、`v1.2.mp4`）。
+- 60 项（宿主 37 + 浏览器 23）。新增：视频 MIME、`kind` 分流、`Range` 四类分支、
+  `kindOf` 的扩展名边界（大写、无扩展名、`v1.2.mp4`），以及「默认库就是 `@builtin` 且
+  真的能列出 9 张」—— 防止以后改默认值时用户装完看到空面板。
 - 另做过一次真实文件集成验证：拿 Wallpaper Engine 库里真实的 mp4/webm 起真 HTTP 服务，
   逐段比对字节与 `Content-Range`。
 

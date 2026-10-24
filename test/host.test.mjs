@@ -120,6 +120,15 @@ describe('sanitizeSettings', () => {
     assert.deepEqual(host.sanitizeSettings({}), host.DEFAULT_SETTINGS);
   });
 
+  it('默认文件夹就是内置示例图（新装用户不必知道 @builtin）', () => {
+    assert.equal(host.DEFAULT_SETTINGS.folder, host.BUILTIN_FOLDER);
+    assert.equal(host.sanitizeSettings({}).folder, host.BUILTIN_FOLDER);
+    // 默认库必须真的能列出包内那 9 张，否则「装完即可换」是空话。
+    const listed = host.listImages(host.DEFAULT_SETTINGS.folder);
+    assert.equal(listed.ok, true);
+    assert.ok(listed.images.length >= 9, `只列出 ${listed.images.length} 项`);
+  });
+
   it('越界数值被夹到合法区间', () => {
     const settings = host.sanitizeSettings({ dim: 999, blur: -5, surface: 500, sidebarDelta: -1 });
     assert.equal(settings.dim, 80);

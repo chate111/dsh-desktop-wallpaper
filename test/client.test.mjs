@@ -86,6 +86,11 @@ describe('模块契约', () => {
     for (const key of ['DEFAULT_SETTINGS', 'SURFACE_TOKENS', 'SIDEBAR_DARKEN', 'sanitize', 'sidebarSurface', 'translucent', 'darken', 'kindOf', 'VIDEO_LAYER_CSS', 'buildStylesheet'])
       assert.ok(key in internals, `缺少 ${key}`);
   });
+
+  it('默认文件夹是内置示例图（装完打开面板就有图可点）', () => {
+    assert.equal(internals.DEFAULT_SETTINGS.folder, '@builtin');
+    assert.equal(internals.sanitize({}).folder, '@builtin');
+  });
 });
 
 describe('translucent', () => {
