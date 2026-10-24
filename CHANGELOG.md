@@ -63,8 +63,10 @@
 
 ### 文档
 
+- 面板按钮与说明改用全名「Wallpaper Engine」：缩写 `WE` 对没装过的人等于没说
+  （按钮：`导入本机 Wallpaper Engine 视频`）。
 - README 补「支持的壁纸格式」表：能播的（H.264 mp4 / VP8·VP9 webm）、
-  需要系统编解码器的（HEVC）、以及明确**不支持**的（WE 的 `.pkg` 场景包）。
+  需要系统编解码器的（HEVC）、以及明确**不支持**的（Wallpaper Engine 的 `.pkg` 场景包）。
 
 ## [0.1.1] — 2026-10-24
 
