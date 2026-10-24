@@ -48,13 +48,16 @@
 - **侧栏入口**：插在「新会话」按钮正下方（找不到就退到「侧边对话」上方，再不行进设置面板）。
   用 `MutationObserver` 自愈重挂，侧栏重渲染后不会丢。
 - **壁纸库 = 本地文件夹**：`选择文件夹` 走 Windows 原生目录对话框；也可以直接把路径粘进输入框
-  （例如 `D:\dsh背景`）。文件夹里的 jpg / jpeg / png / webp / gif / bmp / avif 都会被列出。
+  （例如 `D:\dsh背景`）。文件夹里的 jpg / jpeg / png / webp / gif / bmp / avif 以及 mp4 / webm 都会被列出。
 - **开箱即用**：包内自带 **9 张示例壁纸**（`wallpapers/`，**原图**，最长边最高 7680）。
   在文件夹输入框里填 **`@builtin`** 就直接用它，不必先准备自己的图库。
   宿主按原分辨率流式返回，所以内置图也不会被二次压缩。
   > ⚠️ 这 9 张是**第三方素材**（搜集自公开壁纸站点），仅作功能演示，
   > 版权归原作者所有；**侵删致歉** —— 详见 [wallpapers/NOTICE.md](wallpapers/NOTICE.md)。
 - **手动点选**：面板里是缩略图网格，点哪张用哪张；当前选中的显示大图预览。
+- **视频壁纸**：文件夹里的 `mp4` / `webm` 也能直接当壁纸 —— 背景层换成 `<video muted loop playsinline>`，
+  `暗化` / `模糊` 同样作用在视频上。面板里视频显示为 ▶ 磁贴（不预加载，几百个视频也不卡），
+  选中后预览区直接播放。宿主 `/img` 支持 `Range`，所以边下边播、能拖进度、不整段读进内存。
 - **三条滑杆**：`暗化 0–80%`、`模糊 0–24px`、`透出 0–100%`，拖动即时生效。
 - **分区透出**：
 
@@ -142,7 +145,7 @@ curl "http://127.0.0.1:19387/dsh-desktop-wallpaper/load"
 1. 点侧栏的 **「壁纸」** 打开面板；
 2. **选库**：点 `选择文件夹`（原生对话框），或把绝对路径粘进输入框后点 `使用`
    —— 想先用自带的示例图，就填 **`@builtin`**；换过库之后点 `重扫` 刷新列表；
-3. **选图**：在缩略图网格里点任意一张 —— 立即铺满窗口，并记住这一张；
+3. **选图**：在缩略图网格里点任意一张（或任意一个 ▶ 视频）—— 立即铺满窗口，并记住这一个；
 4. **调效果**：拖 `暗化` / `模糊` / `透出` 三条滑杆；
 5. `恢复默认` 一键还原（包含文件夹路径）。
 
@@ -234,15 +237,16 @@ html[data-dwp-active] [class*="sidebarCol"] { --dsw-…: color-mix(in srgb, colo
 
 ```sh
 npm run check   # 两个半区的语法检查
-npm test        # 47 项断言（宿主 30 + 浏览器 17）
+npm test        # 56 项断言（宿主 36 + 浏览器 20）
 ```
 
 - **宿主半区**：纯函数（`sanitizeSettings` / `listImages` / `resolveWallpaper`）＋
-  用假 cordis ctx 驱动**真实 handler** —— 5 条路由注册、设置往返落盘、原图流式返回与 MIME、
-  路径穿越拒绝、`405 / 403 / 400 / 404 / 413`、disposer 注销、缺 `webServer` 时只警告不抛异常。
+  用假 cordis ctx 驱动**真实 handler** —— 5 条路由注册、设置往返落盘、原图/视频流式返回与 MIME、
+  `Range` 的 206 / 416 / 后缀区间 / 非法回退、路径穿越拒绝、`405 / 403 / 400 / 404 / 413`、
+  disposer 注销、缺 `webServer` 时只警告不抛异常。
   `/pick` 只断言"注册了" —— 真调它会弹出原生对话框。
 - **浏览器半区**：`window.__ModuleLoader__` 与最小 DOM 桩，捕获 factory 返回值后断言
-  `translucent` / `darken` / `sidebarSurface` / `sanitize`，
+  `translucent` / `darken` / `sidebarSurface` / `sanitize` / `kindOf`（视频走 `<video>` 的分流），
   以及**真实生成的样式表**（分区 alpha、侧栏压暗、顶栏不透明、圆角直角、`#root` 抬升、皮肤图层隐藏）。
   不调用 `apply()` —— 那会真的改 DOM 并请求宿主。
 
@@ -297,6 +301,24 @@ dsh-desktop-wallpaper/
 ## ⚠️ 兼容性
 
 针对 **DSH desktop profile 0.2.0-rc.2** 实测。
+
+### 支持的壁纸格式
+
+| 类型 | 扩展名 | 说明 |
+|---|---|---|
+| 静态图 | `.jpg` `.jpeg` `.png` `.webp` `.bmp` `.avif` | 原图直出，不二次压缩 |
+| 动图 | `.gif` | 走 CSS 背景，会动 |
+| 视频 | `.mp4` `.webm` | `<video muted loop playsinline>`，暗化/模糊同样生效 |
+
+- **mp4**：H.264（`avc1` / `mp42` / `isom`）Chromium 原生可播；HEVC（`hvc1`）需要系统装
+  「HEVC 视频扩展」，否则只会在控制台打一条 warn、背景保持空。
+- **webm**：VP8 / VP9 均可播（Wallpaper Engine 的视频壁纸大多是 VP8）。
+- **不支持**：Wallpaper Engine 的 `.pkg` 场景包（私有加密格式，开源侧无可靠解包方案）、
+  以及 `dxs` / `js` 场景脚本。它们**不会出现在列表里**，不用指望勾上就能动。
+- 视频按 `Range` 流式读取，所以 4K 大文件也不会整段进内存；但**模糊 + 4K 视频**很吃 GPU，
+  卡的话把 `模糊` 拉到 0。
+
+### 依赖的宿主钩子
 
 侧栏入口依赖 shell 的 class 钩子（`sidebarCol` / `logoRow` / `newSession`）—— 这些是**哈希类名的一部分，
 版本升级可能变化**。若某次升级后入口不出现，插件只会在控制台记一条 warn，不影响 GUI，

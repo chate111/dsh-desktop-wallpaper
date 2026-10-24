@@ -3,6 +3,35 @@
 本插件的所有值得记录的改动。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.0] — 2026-10-25
+
+### 新增
+
+- **视频壁纸**：`mp4` / `webm` 现在和图片一样能当壁纸。
+  - 背景层多一个 `<video muted loop playsinline autoplay>`（同样 `inset:-40px` 过扫描），
+    `暗化` 走 scrim、`模糊` 走 `filter`，和图片的行为一致。
+  - 只有 `src` 真的换了才重新加载 —— `applyVisuals()` 在切主题时也会跑，
+    否则每次切主题都会把视频重启一遍。
+  - 关闭壁纸 / 切回图片时 `pause()` 并清掉 `src`，不留在后台解码。
+- **宿主 `/img` 支持 `Range`**：206 分段、416 越界（带 `bytes */size`）、
+  后缀区间（`bytes=-512`）、非法或多段请求退回整段 200，一律带 `accept-ranges: bytes`。
+  视频拖进度、快速起播、不整段读进内存都靠它。
+- **`/list` 每项带 `kind`**（`image` / `video`），客户端据此决定用 CSS 背景还是 `<video>`。
+- **面板**：视频显示为 ▶ 磁贴（刻意不预加载 —— Wallpaper Engine 库里动辄上百个视频，
+  一格一个 `<video>` 会立刻发几百个请求）；选中后在预览区直接播放，标题带文件大小。
+
+### 测试
+
+- 56 项（宿主 36 + 浏览器 20）。新增：视频 MIME、`kind` 分流、`Range` 四类分支、
+  `kindOf` 的扩展名边界（大写、无扩展名、`v1.2.mp4`）。
+- 另做过一次真实文件集成验证：拿 Wallpaper Engine 库里真实的 mp4/webm 起真 HTTP 服务，
+  逐段比对字节与 `Content-Range`。
+
+### 文档
+
+- README 补「支持的壁纸格式」表：能播的（H.264 mp4 / VP8·VP9 webm）、
+  需要系统编解码器的（HEVC）、以及明确**不支持**的（WE 的 `.pkg` 场景包）。
+
 ## [0.1.1] — 2026-10-24
 
 ### 修复

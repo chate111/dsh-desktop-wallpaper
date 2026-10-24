@@ -29,6 +29,8 @@ before(() => {
   mkdirSync(library, { recursive: true });
   writeFileSync(join(library, 'b.jpg'), Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
   writeFileSync(join(library, 'a.png'), Buffer.alloc(32, 7));
+  writeFileSync(join(library, 'c.mp4'), Buffer.alloc(64, 1));
+  writeFileSync(join(library, 'd.webm'), Buffer.alloc(40, 2));
   writeFileSync(join(library, 'note.txt'), 'not an image');
   mkdirSync(join(library, 'subfolder'), { recursive: true });
 });
@@ -135,10 +137,17 @@ describe('sanitizeSettings', () => {
 });
 
 describe('listImages', () => {
-  it('只列位图，跳过非图片文件与子目录', () => {
+  it('列出位图与视频，跳过非媒体文件与子目录', () => {
     const result = host.listImages(library);
     assert.equal(result.ok, true);
-    assert.deepEqual(result.images.map((image) => image.name), ['a.png', 'b.jpg']);
+    assert.deepEqual(result.images.map((image) => image.name), ['a.png', 'b.jpg', 'c.mp4', 'd.webm']);
+  });
+
+  it('每项带 kind，视频与静态图能区分开', () => {
+    const kinds = Object.fromEntries(host.listImages(library).images.map((image) => [image.name, image.kind]));
+    assert.equal(kinds['a.png'], 'image');
+    assert.equal(kinds['c.mp4'], 'video');
+    assert.equal(kinds['d.webm'], 'video');
   });
 
   it('中文目录名不会被破坏（回归：GBK/UTF-8 混淆）', () => {
@@ -160,6 +169,11 @@ describe('resolveWallpaper', () => {
     const target = host.resolveWallpaper(library, 'a.png');
     assert.equal(target?.mime, 'image/png');
     assert.equal(target?.size, statSync(join(library, 'a.png')).size);
+  });
+
+  it('视频给出 video/* MIME（客户端据此走 <video>）', () => {
+    assert.equal(host.resolveWallpaper(library, 'c.mp4')?.mime, 'video/mp4');
+    assert.equal(host.resolveWallpaper(library, 'd.webm')?.mime, 'video/webm');
   });
 
   const refusals = [
@@ -231,7 +245,7 @@ describe('HTTP 路由（假 ctx 驱动真 handler）', () => {
   it('GET /list 用已保存的文件夹', async () => {
     const res = await call(routes.get(host.LIST_ROUTE), { url: host.LIST_ROUTE });
     assert.equal(res.status, 200);
-    assert.equal(res.json.images.length, 2);
+    assert.equal(res.json.images.length, 4);
   });
 
   it('GET /list?folder=… 覆盖已保存的文件夹', async () => {
@@ -258,7 +272,52 @@ describe('HTTP 路由（假 ctx 驱动真 handler）', () => {
     assert.equal(res.status, 200);
     assert.equal(res.headers['content-type'], 'image/png');
     assert.equal(res.headers['content-length'], '32');
+    assert.equal(res.headers['accept-ranges'], 'bytes');
     assert.equal(Buffer.concat(res.chunks).length, 32);
+  });
+
+  it('GET /img 视频支持 Range → 206 + Content-Range（拖动/续播的前提）', async () => {
+    const res = await call(routes.get(host.IMG_ROUTE), {
+      url: `${host.IMG_ROUTE}?name=c.mp4`,
+      headers: { range: 'bytes=0-9' },
+    });
+    assert.equal(res.status, 206);
+    assert.equal(res.headers['content-type'], 'video/mp4');
+    assert.equal(res.headers['content-range'], 'bytes 0-9/64');
+    assert.equal(res.headers['content-length'], '10');
+    const body = Buffer.concat(res.chunks);
+    assert.equal(body.length, 10);
+    assert.deepEqual([...body], Array.from({ length: 10 }, () => 1));
+  });
+
+  it('GET /img 开区间 Range（bytes=N-）返回尾部', async () => {
+    const res = await call(routes.get(host.IMG_ROUTE), {
+      url: `${host.IMG_ROUTE}?name=c.mp4`,
+      headers: { range: 'bytes=54-' },
+    });
+    assert.equal(res.status, 206);
+    assert.equal(res.headers['content-range'], 'bytes 54-63/64');
+    assert.equal(Buffer.concat(res.chunks).length, 10);
+  });
+
+  it('GET /img 越界 Range → 416，且带 bytes */size', async () => {
+    const res = await call(routes.get(host.IMG_ROUTE), {
+      url: `${host.IMG_ROUTE}?name=c.mp4`,
+      headers: { range: 'bytes=999-' },
+    });
+    assert.equal(res.status, 416);
+    assert.equal(res.headers['content-range'], 'bytes */64');
+  });
+
+  it('GET /img 非法/多段 Range 退回整段 200，不报错', async () => {
+    for (const range of ['bytes=0-1,5-6', 'items=0-1', 'bytes=abc']) {
+      const res = await call(routes.get(host.IMG_ROUTE), {
+        url: `${host.IMG_ROUTE}?name=c.mp4`,
+        headers: { range },
+      });
+      assert.equal(res.status, 200, `应退回整段：${range}`);
+      assert.equal(Buffer.concat(res.chunks).length, 64);
+    }
   });
 
   it('GET /img 拒绝穿越与越界名 → 404', async () => {

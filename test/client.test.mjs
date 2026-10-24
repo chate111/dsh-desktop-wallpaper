@@ -83,7 +83,7 @@ describe('模块契约', () => {
   });
 
   it('暴露测试用的内部成员', () => {
-    for (const key of ['DEFAULT_SETTINGS', 'SURFACE_TOKENS', 'SIDEBAR_DARKEN', 'sanitize', 'sidebarSurface', 'translucent', 'darken', 'buildStylesheet'])
+    for (const key of ['DEFAULT_SETTINGS', 'SURFACE_TOKENS', 'SIDEBAR_DARKEN', 'sanitize', 'sidebarSurface', 'translucent', 'darken', 'kindOf', 'buildStylesheet'])
       assert.ok(key in internals, `缺少 ${key}`);
   });
 });
@@ -116,6 +116,20 @@ describe('darken', () => {
 describe('sidebarSurface', () => {
   it('侧栏 = 主区 + delta（默认 66 + 15）', () => {
     assert.equal(internals.sidebarSurface(), 81);
+  });
+});
+
+describe('kindOf', () => {
+  it('mp4 / webm 走 <video>', () => {
+    assert.equal(internals.kindOf('a.mp4'), 'video');
+    assert.equal(internals.kindOf('B.WEBM'), 'video');
+  });
+
+  it('位图走 CSS 背景，含无扩展名与点号在中间的名字', () => {
+    assert.equal(internals.kindOf('a.jpg'), 'image');
+    assert.equal(internals.kindOf('动图.gif'), 'image');
+    assert.equal(internals.kindOf('no-extension'), 'image');
+    assert.equal(internals.kindOf('v1.2.mp4'), 'video');
   });
 });
 
