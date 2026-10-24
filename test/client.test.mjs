@@ -162,6 +162,16 @@ describe('buildStylesheet', () => {
     assert.ok(!composerRule.includes('#000'), '输入卡片不应被压暗');
   });
 
+  it('设置面板 / 弹窗被压回不透明（回归：设置页透出聊天记录）', () => {
+    const overlayRule = css.split('\n').find((line) => line.includes('[role="dialog"]'));
+    assert.ok(overlayRule !== undefined, '应有弹层作用域的规则');
+    assert.ok(overlayRule.includes(`: ${THEME_COLOR} !important`), '弹层应写回主题原色');
+    assert.ok(!overlayRule.includes('color-mix'), '弹层不得半透明');
+    assert.ok(!overlayRule.includes('#000'), '弹层不应被压暗');
+    // 弹层规则不能污染主区：gate 之后紧跟的是弹层选择器，而不是 body。
+    assert.ok(!overlayRule.includes('] body '), '弹层规则不得作用到 body');
+  });
+
   it('顶栏 ::before 被压回不透明（需求①）', () => {
     const strip = css.split('\n').find((line) => line.includes('::before'));
     assert.ok(strip !== undefined);

@@ -3,6 +3,22 @@
 本插件的所有值得记录的改动。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.1.1] — 2026-10-24
+
+### 修复
+
+- **设置面板 / 弹窗跟着透出壁纸**：壁纸打开后整个窗口的表面 token 都被换成半透明，
+  而这些弹层是 portal 到 `#root` 之外的，于是继承了同一套 token —— 设置页正对着聊天记录，
+  底下的字透上来基本没法读。现在给弹层（`settingsModal` / `*Dialog` / `[role="dialog"]` / `*modal` 等）
+  单独写回主题的**原始不透明值**，且只作用于弹层作用域，主区的透出不受影响。
+- **测试**：补一条回归断言，锁住「弹层规则存在、是不透明原色、不含 `color-mix`」（47 → 48 项）。
+
+### 文档
+
+- npm 页面上的安装说明换成真实可用的一种：`dsh plugin --profile desktop add dsh-desktop-wallpaper`
+  （0.1.0 的 tarball 里那份 README 还停留在「粘贴本机绝对路径」的开发版说明，照着做必然失败）。
+- 界面预览的两张截图随本版进入 npm 页面（此前只在 GitHub 仓库里）。
+
 ## [0.1.0] — 2026-10-15
 
 首次发布。以下为发布前完成的全部工作。
