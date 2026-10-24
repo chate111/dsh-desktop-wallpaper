@@ -233,7 +233,7 @@ describe('HTTP 路由（假 ctx 驱动真 handler）', () => {
   it('注册了全部 6 条路由', () => {
     assert.deepEqual(
       [...routes.keys()].sort(),
-      [host.LOAD_ROUTE, host.SAVE_ROUTE, host.PICK_ROUTE, host.LIST_ROUTE, host.IMG_ROUTE, host.IMPORT_ROUTE].sort(),
+      [host.LOAD_ROUTE, host.SAVE_ROUTE, host.PICK_ROUTE, host.LIST_ROUTE, host.IMG_ROUTE, host.WE_INDEX_ROUTE].sort(),
     );
   });
 
@@ -397,11 +397,10 @@ describe('HTTP 路由（假 ctx 驱动真 handler）', () => {
   });
 });
 
-describe('Wallpaper Engine 导入（读运行插件那台机器，不写死路径）', () => {
+describe('Wallpaper Engine 索引（只记路径，不复制；读运行插件那台机器）', () => {
   const steam = join(sandbox, 'fake-steam');
   const workshop = join(steam, 'steamapps', 'workshop', 'content', '431960');
   const projects = join(steam, 'steamapps', 'common', 'wallpaper_engine', 'projects');
-  const imported = join(sandbox, 'imported');
   const rootsOf = () => host.discoverWallpaperEngineRoots([steam], { registry: false, defaults: false });
 
   before(() => {
@@ -437,74 +436,62 @@ describe('Wallpaper Engine 导入（读运行插件那台机器，不写死路�
     assert.equal(scanned.includes('preview.jpg'), false);
   });
 
-  it('导入时用「标题-工坊ID」命名，并避开非法字符', async () => {
-    const result = await host.importWallpaperEngine({ roots: rootsOf(), targetDir: imported });
+  it('索引时用「标题-工坊ID」命名，并避开非法字符', () => {
+    const result = host.indexWallpaperEngine({ roots: rootsOf() });
     assert.equal(result.ok, true);
-    assert.equal(result.copied, 1); // 默认视频优先
-    assert.equal(result.failed, 0);
-    assert.ok(existsSync(join(imported, '雨窗 Rain-1111111.mp4')), '应使用标题 + 工坊 id');
+    assert.equal(result.count, 1); // 默认只收视频
+    const entries = host.readWeIndex();
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].name, '雨窗 Rain-1111111.mp4');
+    assert.equal(entries[0].kind, 'video');
+    assert.equal(entries[0].path, join(workshop, '1111111', 'video.mp4'), '索引里存的是原始路径');
   });
 
-  it('includeImages 时图片也能进，still 用文件名兜底', async () => {
-    const result = await host.importWallpaperEngine({ roots: rootsOf(), targetDir: imported, includeImages: true });
-    assert.equal(result.copied, 2);
-    assert.ok(existsSync(join(imported, 'still-2222222.png')));
-    assert.ok(existsSync(join(imported, 'scene-myprojects.jpg')));
+  it('索引不复制文件（磁盘上不会多出副本）', () => {
+    assert.equal(existsSync(join(sandbox, 'dsh-home', 'dsh-desktop-wallpaper', 'imported')), false);
+    assert.ok(existsSync(host.weIndexPath()), '应写出 we-index.json');
   });
 
-  it('再导一次是幂等的（同样大小视为已导入）', async () => {
-    const again = await host.importWallpaperEngine({ roots: rootsOf(), targetDir: imported, includeImages: true });
-    assert.equal(again.copied, 0);
-    assert.equal(again.skipped, 3);
+  it('includeImages 时图片也进索引，still 用文件名兜底', () => {
+    const result = host.indexWallpaperEngine({ roots: rootsOf(), includeImages: true });
+    assert.equal(result.count, 3);
+    const names = host.readWeIndex().map((entry) => entry.name).sort();
+    assert.deepEqual(names, ['scene-myprojects.jpg', 'still-2222222.png', '雨窗 Rain-1111111.mp4']);
   });
 
-  it('预算不被已导入的文件吃掉（回归：第二次点击永远导 0 个）', async () => {
-    const dir = join(sandbox, 'budget');
-    const options = { roots: rootsOf(), targetDir: dir, includeImages: true, maxTotalBytes: 45 * 1024 };
+  it('@builtin 把索引条目和自带那 9 张合成一个列表，并且能解析到原文件', () => {
+    host.indexWallpaperEngine({ roots: rootsOf(), includeImages: true });
+    const listed = host.listImages(host.BUILTIN_FOLDER);
+    assert.equal(listed.ok, true);
+    assert.ok(listed.images.length >= 12, `只有 ${listed.images.length} 项`);
 
-    const first = await host.importWallpaperEngine(options);
-    assert.equal(first.copied, 1);
-    assert.equal(first.skipped, 0);
-    assert.equal(first.truncated, true);
-
-    const second = await host.importWallpaperEngine(options);
-    assert.equal(second.skipped, 1, '上一轮写入的应算作已导入');
-    assert.equal(second.copied, 1, '预算不该被已导入的文件占满');
-    assert.equal(second.bytes, 30 * 1024, '只统计真正拷进来的字节');
+    const name = 'still-2222222.png';
+    assert.ok(listed.images.some((image) => image.name === name));
+    const resolved = host.resolveWallpaper(host.BUILTIN_FOLDER, name);
+    assert.notEqual(resolved, null);
+    assert.equal(resolved.mime, 'image/png');
+    assert.equal(resolved.path, join(workshop, '2222222', 'still.png'), '应直接指向 Steam 里的原文件');
+    // 索引不得让自带的 9 张消失
+    assert.ok(listed.images.some((image) => image.name.startsWith('【哲风壁纸】')));
   });
 
-  it('总量上限会截断，下一轮还能接着导', async () => {
-    const capped = await host.importWallpaperEngine({
-      roots: rootsOf(),
-      targetDir: join(sandbox, 'capped'),
-      maxTotalBytes: 45 * 1024,
-      includeImages: true,
-    });
-    assert.equal(capped.truncated, true);
-    assert.ok(capped.copied >= 1, `只导入了 ${capped.copied} 个`);
-    assert.ok(capped.copied < 3);
-  });
-
-  it('@builtin 把导入的壁纸和自带那 9 张合成一个列表', () => {
-    const previous = process.env.DSH_WALLPAPER_IMPORT_DIR;
-    process.env.DSH_WALLPAPER_IMPORT_DIR = imported;
+  it('源文件被删掉后，索引条目自动消失、解析返回 null', () => {
+    host.indexWallpaperEngine({ roots: rootsOf(), includeImages: true });
+    const ghost = join(workshop, '2222222', 'still.png');
+    rmSync(ghost);
     try {
-      const listed = host.listImages(host.BUILTIN_FOLDER);
-      assert.equal(listed.ok, true);
-      assert.ok(listed.images.length >= 12, `只有 ${listed.images.length} 项`);
-      const name = 'still-2222222.png';
-      assert.ok(listed.images.some((image) => image.name === name));
-      const resolved = host.resolveWallpaper(host.BUILTIN_FOLDER, name);
-      assert.notEqual(resolved, null);
-      assert.equal(resolved.mime, 'image/png');
-      // 导入的文件名不得让自带的 9 张消失
-      assert.ok(listed.images.some((image) => image.name.startsWith('【哲风壁纸】')));
+      const names = host.readWeIndex().map((entry) => entry.name);
+      assert.equal(names.includes('still-2222222.png'), false, '文件没了就不该再列出来');
+      assert.equal(host.resolveWallpaper(host.BUILTIN_FOLDER, 'still-2222222.png'), null);
     }
     finally {
-      if (previous === undefined)
-        delete process.env.DSH_WALLPAPER_IMPORT_DIR;
-      else
-        process.env.DSH_WALLPAPER_IMPORT_DIR = previous;
+      writeFileSync(ghost, Buffer.alloc(30 * 1024, 5));
     }
+  });
+
+  it('客户端给的名字只能是索引里的条目，不能变成任意路径', () => {
+    assert.equal(host.resolveWallpaper(host.BUILTIN_FOLDER, 'C:/Windows/win.ini'), null);
+    assert.equal(host.resolveWallpaper(host.BUILTIN_FOLDER, '..\\..\\secret.mp4'), null);
+    assert.equal(host.resolveWallpaper(host.BUILTIN_FOLDER, 'not-in-index.mp4'), null);
   });
 });

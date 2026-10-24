@@ -60,17 +60,18 @@
   `暗化` / `模糊` 同样作用在视频上。面板里每个视频都有**首帧缩略图**（滚到可见才加载那一帧，
   几百个视频也不会一次发几百个请求），鼠标**悬停即播放**，选中后预览区直接播。
   宿主 `/img` 支持 `Range`，所以边下边播、能拖进度、不整段读进内存。
-- **一键导入本机 Wallpaper Engine 壁纸**：面板里点「导入本机 WE 视频」，
+- **一键收录本机 Wallpaper Engine 壁纸**（面板按钮「扫描本机 Wallpaper Engine」）：
   宿主会**在运行插件的这台机器上**自己找库 —— 读注册表 `HKCU\Software\Valve\Steam\SteamPath`，
   再展开 `libraryfolders.vdf` 里的每个 Steam 库，扫 `steamapps\workshop\content\431960` 与
   `wallpaper_engine\projects`。**代码里没有写死任何路径**，你家在 D 盘、别人家在 E 盘都一样。
-  - 只收 `mp4` / `webm`：WE 里的 jpg/png/gif 基本是 Steam 缩略图（`preview.*`，永远跳过）
-    或 `.pkg` 场景的贴图（`bg.png` / `screen.png`），不是壁纸。
-  - 每次最多拷 1.5 GB、单文件 ≤ 120 MB；到上限会提示「再点一次继续」，
-    已经拷过的按大小判定跳过，所以反复点是**幂等**的、不会越点越多。
-  - 落盘位置是 `$DSH_HOME/dsh-desktop-wallpaper/imported/`，**不进 npm 包** ——
-    否则下次发布就会把用户订阅的工坊内容一起发出去。
-  - 面板的「内置示例图」列表 = 包自带那 9 张 + 导入的这些，合成一个网格。
+  - **只记路径，不复制文件**：索引写到 `$DSH_HOME/dsh-desktop-wallpaper/we-index.json`
+    （几十 KB），播壁纸时 `/img` 直接流式读 Steam 库里的原文件 —— 14 GB 的库也不会多占一份空间、
+    不用等拷贝、不会过期。
+  - 只收 `mp4` / `webm`：Wallpaper Engine 里的 jpg/png/gif 基本是 Steam 缩略图
+    （`preview.*`，永远跳过）或 `.pkg` 场景的贴图（`bg.png` / `screen.png`），不是壁纸。
+  - 只接受索引里登记过的名字：客户端传什么名字都不会变成任意路径读取。
+  - 源文件被删/卸载后自动从列表消失（每次列出都重新 `stat`）。
+  - 面板的「内置示例图」列表 = 包自带那 9 张 + 索引里的这些，合成一个网格。
 - **三条滑杆**：`暗化 0–80%`、`模糊 0–24px`、`透出 0–100%`，拖动即时生效。
 - **分区透出**：
 
