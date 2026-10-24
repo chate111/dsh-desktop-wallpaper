@@ -220,6 +220,12 @@ describe('内置壁纸库（@builtin）', () => {
   });
 });
 
+describe('cancelActivePicker', () => {
+  it('没有在途对话框时返回 false，不抛异常', async () => {
+    assert.equal(await host.cancelActivePicker(), false);
+  });
+});
+
 describe('HTTP 路由（假 ctx 驱动真 handler）', () => {
   const { ctx, routes, warnings, dispose } = fakeContext();
   host.apply(ctx);
