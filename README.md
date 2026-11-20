@@ -5,8 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
-**Purpose-built for DSH Desktop（Electron 桌面端）的壁纸插件** —— 侧栏「新会话」下方一个「壁纸」入口，
-点开面板选一个**本地文件夹**当壁纸库（或直接用**包内自带的 9 张示例图**），
+**Purpose-built for DSH Desktop（Electron 桌面端）的壁纸插件** —— 在 **设置 → 壁纸** 中
+选一个**本地文件夹**当壁纸库（或直接用**包内自带的 9 张示例图**），
 在里面手动点选图片，并用 **暗化 / 模糊 / 透出** 三条滑杆实时调效果。
 表面透明度**按区域分开**：顶部菜单栏与底部输入卡片完全不透，
 左侧栏比主内容区少透出 15% 并额外压暗 20%。
@@ -17,9 +17,7 @@
 
 ## 📸 界面预览
 
-**① 侧栏入口** —— 就在「新会话」正下方，点开即面板：
-
-![侧栏「壁纸」入口](https://raw.githubusercontent.com/chate111/dsh-desktop-wallpaper/main/docs/screenshot-entry.png)
+**① 设置页入口** —— 打开设置，在左导航点「壁纸」，右侧直接显示完整面板。
 
 **② 壁纸面板** —— 一个本地文件夹就是壁纸库（也可以填 `@builtin` 用包内 9 张示例图）、
 缩略图手动点选、暗化 / 模糊 / 透出三条滑杆，底部实时显示各区域的透出数值：
@@ -50,8 +48,8 @@
 
 ## ✨ 功能
 
-- **侧栏入口**：插在「新会话」按钮正下方（找不到就退到「侧边对话」上方，再不行进设置面板）。
-  用 `MutationObserver` 自愈重挂，侧栏重渲染后不会丢。
+- **设置页入口**：使用 DSH 原生 `settings.section` 插槽，在设置左导航注册「壁纸」，
+  右侧显示完整面板；不再依赖侧栏类名、DOM 挂载位置或自愈定时器。
 - **壁纸库 = 本地文件夹**：`选择文件夹` 走 Windows 原生目录对话框；也可以直接把路径粘进输入框
   （例如 `D:\dsh背景`）。文件夹里的 jpg / jpeg / png / webp / gif / bmp / avif 以及 mp4 / webm 都会被列出。
 - **开箱即用**：包内自带 **9 张示例壁纸**（`wallpapers/`，**原图**，最长边最高 7680），
@@ -171,7 +169,7 @@ curl "http://127.0.0.1:19387/dsh-desktop-wallpaper/load"
 
 ## 🎛️ 使用
 
-1. 点侧栏的 **「壁纸」** 打开面板 —— 首次安装**默认就是自带的 9 张示例图**，直接点就能换；
+1. 打开 **设置 → 壁纸** —— 首次安装**默认就是自带的 9 张示例图**，直接点就能换；
 2. **换库**（可选）：点 `选择文件夹`（原生对话框），或把绝对路径粘进输入框后点 `使用`；
    想换回自带的，填 **`@builtin`**；换过库之后点 `重扫` 刷新列表；
 3. **选图**：在缩略图网格里点任意一张（或任意一个 ▶ 视频）—— 立即铺满窗口，并记住这一个；
@@ -192,8 +190,11 @@ curl "http://127.0.0.1:19387/dsh-desktop-wallpaper/load"
 
 - `dsh.bundle.patch` → `cordis.patch.yml` 往 profile 名单里插一行；
 - `dsh.client.platform: "web"` + `exports["./client"]` → 浏览器半区由 client-modules 在
-  `/plugins/dsh-desktop-wallpaper/client.js` 提供，模块约定是 `window.__ModuleLoader__.load({ id, factory })`，
+  `/plugins/dsh-desktop-wallpaper/client.js` 提供，模块约定是
+  `window.__ModuleLoader__.load({ id, factory })`，`factory(require)` 从宿主模块表取得 React，
   导出 `apply` 与 `inject`；
+- `apply()` 通过 `ctx.slots.inject()` / `ctx.slots.register()` 注册原生 `settings.section`，
+  面板作为普通文档流内容嵌入设置页，切换页面时自动卸载并释放资源；
 - `exports["."]` → 宿主半区（普通 ESM），用 `inject: ['webServer']` +
   `ctx.get('webServer').register({ kind: 'exact', path, handler })` 注册 5 条回环路由，包在 `ctx.effect(...)` 里。
 
@@ -246,17 +247,21 @@ html[data-dwp-active] [class*="sidebarCol"] { --dsw-…: color-mix(in srgb, colo
    遮罩保持半透明（它的任务就是淡出正文，同时让壁纸在输入区后面继续可见）。
    这与顶栏是同一种手法：照抄官方已经用上的元素作用域与 token，而不是另写一套。
 
-### 入口位置
+### 设置页入口
 
-桌面端 0.2.0-rc.2 里 **没有 `[data-pane="sidebar"]`**（皮肤插件的 README 仍这么写，但那选择器在该版本是死的）。
-插件用实测有效的钩子定位：
+浏览器半区通过宿主插槽服务注册设置导航，不修改 React 根节点，也不向侧栏插入按钮：
 
 ```js
-[class*="sidebarCol"] → [class*="logoRow"] 的父元素 → button[class*="newSession"] → insertBefore(entry, anchor.nextElementSibling)
+ctx.slots.inject("settings.section", function() {
+  ctx.slots.register(
+    { name: "settings.section", id: "wallpaper", order: 450, label: "壁纸" },
+    WallpaperSettings
+  );
+});
 ```
 
-入口的盒模型按宿主原生行的数值写死（`min-height:36px` / `margin:0 2px` / `padding:7px 8px` /
-`border:none` / `font:inherit`），否则会和原生行错位（内容左边距 19px vs 10px）。
+面板 DOM 挂在设置页提供的宿主元素中，不再依赖 `sidebarCol` / `logoRow` / `newSession`
+等哈希类名。React 使用宿主模块表提供的实例，页面切换时卸载面板并释放视频资源。
 
 ---
 
@@ -266,7 +271,7 @@ html[data-dwp-active] [class*="sidebarCol"] { --dsw-…: color-mix(in srgb, colo
 
 ```sh
 npm run check   # 两个半区的语法检查
-npm test        # 80 项断言（宿主 48 + 浏览器 32）
+npm test        # 82 项断言（宿主 48 + 浏览器 34）
 ```
 
 - **宿主半区**：纯函数（`sanitizeSettings` / `listImages` / `resolveWallpaper`）＋
@@ -276,8 +281,8 @@ npm test        # 80 项断言（宿主 48 + 浏览器 32）
   `/pick` 只断言"注册了" —— 真调它会弹出原生对话框。
 - **浏览器半区**：`window.__ModuleLoader__` 与最小 DOM 桩，捕获 factory 返回值后断言
   `translucent` / `darken` / `sidebarSurface` / `sanitize` / `kindOf`（视频走 `<video>` 的分流），
-  以及**真实生成的样式表**（分区 alpha、侧栏压暗、顶栏不透明、圆角直角、`#root` 抬升、皮肤图层隐藏）。
-  不调用 `apply()` —— 那会真的改 DOM 并请求宿主。
+  **真实生成的样式表**（分区 alpha、侧栏压暗、顶栏不透明、圆角直角、`#root` 抬升、皮肤图层隐藏），
+  以及设置页插槽注册和旧侧栏入口清理。
 
 两个测试文件都把 `DSH_HOME` 指向临时目录，**不会读写机器上真实的设置文件**。
 
@@ -313,7 +318,7 @@ dsh-desktop-wallpaper/
 ├── cordis.patch.yml        # 往 profile 名单插入 ui-dsh-desktop-wallpaper 一行
 ├── lib/
 │   ├── index.js            # 宿主半区：5 条回环路由 + 原生目录对话框 + 原子写设置
-│   └── client.js           # 浏览器半区：侧栏入口 / 面板 / 背景层 / 分区 token
+│   └── client.js           # 浏览器半区：设置页面板 / 背景层 / 分区 token
 ├── docs/                   # README 里的界面截图（只随 GitHub 仓库，不进 npm 包）
 ├── wallpapers/             # 9 张内置示例壁纸（原图，最长边最高 7680），用 @builtin 引用
 ├── test/
@@ -329,7 +334,7 @@ dsh-desktop-wallpaper/
 
 ## ⚠️ 兼容性
 
-针对 **DSH desktop profile 0.2.0-rc.2** 实测。
+针对 **DSH desktop profile 0.2.2-rc.5** 适配；0.3.0 起使用原生设置页插槽。
 
 ### 支持的壁纸格式
 
@@ -349,9 +354,8 @@ dsh-desktop-wallpaper/
 
 ### 依赖的宿主钩子
 
-侧栏入口依赖 shell 的 class 钩子（`sidebarCol` / `logoRow` / `newSession`）—— 这些是**哈希类名的一部分，
-版本升级可能变化**。若某次升级后入口不出现，插件只会在控制台记一条 warn，不影响 GUI，
-改 `SIDEBAR_COLUMN_SELECTORS` / `NEW_SESSION_SELECTORS` 即可。
+设置页入口依赖 DSH 的 `settings.section` 插槽和宿主模块表中的 React，不再依赖侧栏哈希类名。
+插槽注册失败时会在控制台记录错误，不影响壁纸背景层的加载。
 
 分区透明度依赖 `--dsw-*` 表面 token 的**名称**；若上游改名，token 采样会拿不到值，
 此时插件会警告并保持主题原样（不会写出无效 CSS）。

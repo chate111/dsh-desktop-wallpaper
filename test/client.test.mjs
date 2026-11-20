@@ -5,7 +5,7 @@
  * 再给一个刚好够 `captureOriginals()` / `detectSidebarScope()` 用的最小 DOM，
  * 于是可以在 Node 里直接断言**真实生成的样式表**。
  *
- * 不调用 `apply()` —— 那会真的去改 DOM、请求宿主路由并挂 MutationObserver。
+ * 末尾单独用桩化宿主路由调用 `apply()`，验证设置页插槽注册；其它样式测试不启动插件。
  *
  * 这里锁住的是三件曾经踩过的事：
  *   1. 表面 token 必须整块重复声明（在 body 与侧栏绘制元素上各一遍）；
@@ -32,7 +32,10 @@ globalThis.window = {
   __ModuleLoader__: {
     load({ id, factory }) {
       assert.equal(id, 'dsh-desktop-wallpaper');
-      client = factory();
+      client = factory((name) => {
+        if (name !== 'react') throw new Error(`unexpected module: ${name}`);
+        return { createElement() {}, useRef: () => ({ current: null }), useEffect() {} };
+      });
     },
   },
   getComputedStyle: () => computedStyleStub,
@@ -77,9 +80,9 @@ await import('../lib/client.js');
 const internals = client.__internals;
 
 describe('模块契约', () => {
-  it('导出 apply / inject，且不硬依赖任何服务', () => {
+  it('导出 apply / inject，使用宿主设置页插槽', () => {
     assert.equal(typeof client.apply, 'function');
-    assert.deepEqual(client.inject, []);
+    assert.deepEqual(client.inject, ['slots']);
   });
 
   it('暴露测试用的内部成员', () => {
@@ -284,8 +287,13 @@ describe('buildStylesheet', () => {
     assert.ok(!rule.includes('panel-soft'), '说明条不得再铺 panel-soft 底色');
   });
 
-  it('面板不再有厚黑投影（回归：四周那圈黑边）', () => {
-    assert.ok(internals.BASE_CSS.includes('box-shadow: none'), '面板投影应关掉');
+  it('设置页面板采用普通文档流，不带浮层定位或黑影', () => {
+    const start = internals.BASE_CSS.indexOf('[data-dsw-wallpaper-panel] {');
+    assert.ok(start >= 0, '缺少设置页面板规则');
+    const rule = internals.BASE_CSS.slice(start, internals.BASE_CSS.indexOf('}', start));
+    assert.ok(rule.includes('width: 100%'));
+    assert.equal(rule.includes('position: fixed'), false);
+    assert.equal(rule.includes('box-shadow:'), false);
     assert.equal(internals.BASE_CSS.includes('0 18px 48px'), false, '旧的 48px 黑影不得回来');
   });
 
@@ -293,3 +301,220 @@ describe('buildStylesheet', () => {
     assert.equal(css.includes(NON_COLOR_TOKEN), false);
   });
 });
+
+//#region 设置页集成
+/**
+ * 最小 DOM 桩，验证旧入口清理以及设置页插槽注册。
+ * 面板由宿主的 settings.section 插槽直接挂载，不再维护侧栏按钮或浮层定位。
+ */
+
+/** 只认本插件真正用到的几种选择器形态：`tag[class*="x"]` / `[attr]` / `tag`。 */
+function matchesSel(element, selector) {
+  const sel = selector.trim();
+  if (sel.includes(','))
+    return sel.split(',').some((one) => matchesSel(element, one));
+  let found = /^([a-zA-Z0-9-]+)?\[class\*="([^"]+)"\]$/.exec(sel);
+  if (found !== null) {
+    const [, tag, fragment] = found;
+    if (tag !== undefined && element.tag !== tag)
+      return false;
+    return (element.className ?? '').split(/\s+/).some((name) => name.includes(fragment));
+  }
+  found = /^([a-zA-Z0-9-]+)?\[([a-zA-Z-]+)="([^"]*)"\]$/.exec(sel);
+  if (found !== null) {
+    const [, tag, attr, value] = found;
+    if (tag !== undefined && element.tag !== tag)
+      return false;
+    return element.getAttribute(attr) === value;
+  }
+  found = /^([a-zA-Z0-9-]+)?\[([a-zA-Z-]+)\]$/.exec(sel);
+  if (found !== null) {
+    const [, tag, attr] = found;
+    if (tag !== undefined && element.tag !== tag)
+      return false;
+    return element.hasAttribute(attr);
+  }
+  if (/^[a-zA-Z0-9-]+$/.test(sel))
+    return element.tag === sel;
+  return false;
+}
+
+function makeNode(tag, className = '') {
+  const attributes = new Map();
+  const element = {
+    tag,
+    className,
+    children: [],
+    parentElement: null,
+    isConnected: true,
+    textContent: '',
+    style: {},
+    get previousElementSibling() {
+      if (this.parentElement === null)
+        return null;
+      const siblings = this.parentElement.children;
+      const at = siblings.indexOf(this);
+      return at > 0 ? siblings[at - 1] : null;
+    },
+    get nextElementSibling() {
+      if (this.parentElement === null)
+        return null;
+      const siblings = this.parentElement.children;
+      const at = siblings.indexOf(this);
+      return at >= 0 && at + 1 < siblings.length ? siblings[at + 1] : null;
+    },
+    get lastElementChild() {
+      return this.children.length === 0 ? null : this.children[this.children.length - 1];
+    },
+    get firstElementChild() {
+      return this.children.length === 0 ? null : this.children[0];
+    },
+    setAttribute(name, value) { attributes.set(name, String(value)); },
+    getAttribute(name) { return attributes.has(name) ? attributes.get(name) : null; },
+    hasAttribute(name) { return attributes.has(name); },
+    appendChild(child) {
+      child.remove();
+      child.parentElement = this;
+      this.children.push(child);
+      return child;
+    },
+    insertBefore(child, reference) {
+      child.remove();
+      child.parentElement = this;
+      if (reference === null || reference === undefined) {
+        this.children.push(child);
+        return child;
+      }
+      this.children.splice(this.children.indexOf(reference), 0, child);
+      return child;
+    },
+    remove() {
+      if (this.parentElement === null)
+        return;
+      const at = this.parentElement.children.indexOf(this);
+      if (at >= 0)
+        this.parentElement.children.splice(at, 1);
+      this.parentElement = null;
+    },
+    contains(other) {
+      let current = other;
+      while (current !== null && current !== undefined) {
+        if (current === this)
+          return true;
+        current = current.parentElement;
+      }
+      return false;
+    },
+    querySelectorAll(selector) {
+      const hits = [];
+      const walk = (node) => {
+        for (const child of node.children) {
+          if (matchesSel(child, selector))
+            hits.push(child);
+          walk(child);
+        }
+      };
+      walk(this);
+      return hits;
+    },
+    querySelector(selector) {
+      return this.querySelectorAll(selector)[0] ?? null;
+    },
+    matches(selector) { return matchesSel(this, selector); },
+  };
+  return element;
+}
+
+/**
+ * 复刻侧栏的结构：layout 的 grid 列里装着 sidebar 包的行根节点，
+ * 行根节点下依次是 logoRow / 新会话 / 面板列表 / 工作区 / 底部账户行（头像）。
+ */
+function buildSidebarDom() {
+  const body = makeNode('body');
+  const column = makeNode('div', 'pI_x6G_sidebarCol');
+  const root = makeNode('div', 'hHd-Xa_root');
+  const logoRow = makeNode('div', 'hHd-Xa_logoRow');
+  const newSession = makeNode('button', 'hHd-Xa_newSession');
+  const panelList = makeNode('nav', 'hHd-Xa_panelList');
+  const workspaces = makeNode('div', 'hHd-Xa_regionArea');
+  const footArea = makeNode('div', 'hHd-Xa_footArea');
+  const avatar = makeNode('img', 'hHd-Xa_avatar');
+  footArea.appendChild(avatar);
+
+  const documentStub = {
+    body,
+    documentElement: { setAttribute() {}, removeAttribute() {}, hasAttribute: () => true },
+    head: makeNode('head'),
+    createElement(tag) { return makeNode(tag); },
+    querySelector: (selector) => body.querySelector(selector) ?? (matchesSel(body, selector) ? body : null),
+    querySelectorAll: (selector) => body.querySelectorAll(selector),
+    addEventListener() {},
+    removeEventListener() {},
+  };
+
+  body.appendChild(column);
+  column.appendChild(root);
+  root.appendChild(logoRow);
+  root.appendChild(newSession);
+  root.appendChild(panelList);
+  root.appendChild(workspaces);
+  root.appendChild(footArea);
+
+  return { body, column, root, logoRow, newSession, panelList, workspaces, footArea, avatar, documentStub };
+}
+
+describe('旧侧栏入口清理（0.3.0 起仅使用设置页）', () => {
+  const originalDocument = globalThis.document;
+
+  it('删除旧版遗留的入口，不再创建侧栏按钮', () => {
+    const dom = buildSidebarDom();
+    globalThis.document = dom.documentStub;
+    try {
+      const legacy = makeNode('button');
+      legacy.setAttribute('data-dsw-wallpaper-entry', '');
+      dom.root.appendChild(legacy);
+      assert.equal(internals.removeLegacyEntry(), undefined);
+      assert.equal(dom.root.querySelector('[data-dsw-wallpaper-entry]'), null);
+      internals.removeLegacyEntry();
+      assert.equal(dom.root.querySelector('[data-dsw-wallpaper-entry]'), null, '不得重新创建');
+    }
+    finally {
+      globalThis.document = originalDocument;
+    }
+  });
+});
+describe('设置页注册（DSH 0.2.2 原生插槽）', () => {
+  it('注册「壁纸」导航，不再把入口塞进侧栏', async () => {
+    const calls = [];
+    const originalFetch = globalThis.fetch;
+    const originalObserver = globalThis.MutationObserver;
+    globalThis.MutationObserver = class { observe() {} disconnect() {} };
+    globalThis.fetch = async () => ({ ok: false, status: 503, json: async () => ({ ok: false }) });
+    const ctx = {
+      slots: {
+        inject(name, register) {
+          assert.equal(name, 'settings.section');
+          register();
+        },
+        register(meta, component) {
+          calls.push({ meta, component });
+        },
+      },
+    };
+    try {
+      client.apply(ctx);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].meta.name, 'settings.section');
+      assert.equal(calls[0].meta.id, 'wallpaper');
+      assert.equal(calls[0].meta.label, '壁纸');
+      assert.equal(typeof calls[0].component, 'function');
+      assert.equal(document.querySelector('[data-dsw-wallpaper-entry]'), null);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    finally {
+      globalThis.fetch = originalFetch;
+      globalThis.MutationObserver = originalObserver;
+    }
+  });
+});
+//#endregion
